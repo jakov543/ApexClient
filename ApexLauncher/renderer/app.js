@@ -22,6 +22,7 @@ const MODS = [
 ];
 
 const NEWS = [
+  { tag: 'v1.7', t: 'New Minecraft look', p: 'Grass, dirt and sky, pixel fonts, chunky buttons and a green Apex logo.' },
   { tag: 'v1.6', t: 'Mods, resource packs & shaders', p: 'Search Modrinth and install with one click on the Mods page. Shaders set up Iris + Sodium for you.' },
   { tag: 'FREE', t: 'Luanti — free for everyone', p: 'No Minecraft? Switch to Luanti on Home and play Mineclonia or VoxeLibre for free, no account needed.' },
   { tag: 'v1.4', t: 'New in-game menus', p: 'Brand-new main menu and Right Shift mod menu with profiles, search, and OPTIONS for every mod (1.21.1).' },
