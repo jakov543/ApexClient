@@ -6,6 +6,7 @@ const { Auth } = require('msmc');
 const cfg = require('./config');
 const game = require('./src/game');
 const DiscordRPC = require('./src/discord');
+const { minecraftLogin, niceError, isValid, toMclc } = require('./src/mcauth');
 
 let win;
 let account = null;        // { name, uuid }
@@ -98,8 +99,21 @@ ipcMain.handle('settings:set', (_e, patch) => {
 });
 
 function toAccount(mc) {
-  const demo = !!(mc.profile && mc.profile.demo);
-  return { name: demo ? 'Demo player' : mc.profile.name, uuid: demo ? null : mc.profile.id, demo };
+  return { name: mc.demo ? 'Demo player' : mc.name, uuid: mc.demo ? null : mc.id, demo: mc.demo };
+}
+
+// launcher log file (userData/launcher.log) so sign-in problems can be checked later
+function logLine(line) {
+  try { fs.appendFileSync(path.join(app.getPath('userData'), 'launcher.log'), `[${new Date().toISOString()}] ${line}\n`); } catch (_) {}
+  send('game:log', '[Launcher] ' + line);
+}
+
+/** Microsoft refresh token -> Minecraft session */
+async function signInWithToken(token) {
+  let xbox;
+  try { xbox = await auth.refresh(token); } catch (e) { throw niceError(e); }
+  storeToken(xbox.save());
+  return minecraftLogin(xbox);
 }
 
 ipcMain.handle('versions:list', async () => game.listVersions());
@@ -109,22 +123,28 @@ ipcMain.handle('account:get', async () => {
   const token = readToken();
   if (!token) return null;
   try {
-    const xbox = await auth.refresh(token);
-    mcAuth = await xbox.getMinecraft();
-    storeToken(xbox.save());
+    mcAuth = await signInWithToken(token);
     account = toAccount(mcAuth);
     return account;
   } catch (e) {
+    logLine('Auto sign-in failed: ' + niceError(e).message);
     return null; // expired → ask to log in again
   }
 });
 
 ipcMain.handle('account:login', async () => {
-  const xbox = await auth.launch('electron', { width: 500, height: 650, resizable: false, title: 'Sign in with Microsoft' });
-  mcAuth = await xbox.getMinecraft();   // accounts without Minecraft get the official Demo
-  storeToken(xbox.save());
-  account = toAccount(mcAuth);
-  return account;
+  try {
+    const xbox = await auth.launch('electron', { width: 500, height: 650, resizable: false, title: 'Sign in with Microsoft', autoHideMenuBar: true });
+    storeToken(xbox.save());
+    mcAuth = await minecraftLogin(xbox);  // no Minecraft on the account → official Demo
+    account = toAccount(mcAuth);
+    logLine(`Signed in as ${account.name}${account.demo ? ' (demo)' : ''}`);
+    return account;
+  } catch (e) {
+    const err = niceError(e);
+    logLine('Sign-in failed: ' + err.message);
+    throw err;
+  }
 });
 
 ipcMain.handle('account:logout', () => {
@@ -136,7 +156,11 @@ ipcMain.handle('game:launch', async () => {
   if (gameProc) throw new Error('Game is already running');
   if (!mcAuth) throw new Error('SIGN_IN');
   // refresh the Minecraft token if it expired while the launcher was open
-  if (!mcAuth.validate()) mcAuth = await mcAuth.refresh(true);
+  if (!isValid(mcAuth)) {
+    const token = readToken();
+    if (!token) throw new Error('SIGN_IN');
+    mcAuth = await signInWithToken(token);
+  }
 
   const bundledModsDir = app.isPackaged
     ? path.join(process.resourcesPath, 'mods')
@@ -146,7 +170,7 @@ ipcMain.handle('game:launch', async () => {
 
   gameProc = await game.launch({
     app,
-    auth: mcAuth.mclc(),
+    auth: toMclc(mcAuth),
     version: settings.version || cfg.MC_VERSION,
     ramMb: settings.ramMb,
     bundledModsDir,

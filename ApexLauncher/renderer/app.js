@@ -165,10 +165,12 @@ $('btnLogin').onclick = async () => {
     const acc = await apex.login();
     try { localStorage.removeItem('skipLogin'); } catch (_) {}
     setAccount(acc);
-    toast(acc.demo ? 'Signed in — this account has no Minecraft, so you get the free Demo.' : 'Signed in — have fun!');
+    toast(acc.demo
+      ? 'Signed in. No Minecraft Java profile on this account, so you get the free Demo. (Game Pass? Open the official launcher once to pick a name.)'
+      : 'Signed in — have fun!');
   } catch (e) {
     const msg = String(e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
-    $('loginErr').textContent = /cancel|closed/i.test(msg) ? 'Sign in cancelled.' : msg;
+    $('loginErr').textContent = /cancel|closed by user/i.test(msg) ? 'Sign in cancelled.' : msg;
   } finally { b.disabled = false; }
 };
 
