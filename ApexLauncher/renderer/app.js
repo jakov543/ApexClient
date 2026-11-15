@@ -55,10 +55,11 @@ $('btnClose').onclick = () => apex.close();
 
 // ---------------------------------------------------------------- account
 let currentAccount = null;
+let demoAccepted = false;   // user chose "Later (play Demo)"
 
 function readySub() {
   if (!currentAccount) return 'Sign in with Microsoft to play';
-  if (currentAccount.status === 'needsName') return 'Pick your username to play';
+  if (currentAccount.status === 'needsName' && !demoAccepted) return 'Pick your username to play';
   return currentAccount.demo ? 'Demo mode · tap your name → Why Demo?' : 'Ready to play';
 }
 function idleLaunch() { setLaunch(currentAccount ? 'LAUNCH GAME' : 'SIGN IN TO PLAY', readySub()); }
@@ -111,6 +112,10 @@ $('btnWhyDemo').onclick = e => { e.stopPropagation(); $('account').classList.rem
 let nameTimer = null;
 function showNameModal() {
   $('nameErr').textContent = ''; $('nameSt').textContent = ''; $('nameSt').className = 'name-st';
+  const a = currentAccount || {};
+  $('nameText').textContent = a.likelyJava
+    ? 'This account has Minecraft: Java Edition but no username yet. Choose one to get the full game — the same as in the official launcher. You can change it later on minecraft.net.'
+    : 'This account has Minecraft. If it includes Java Edition (for example the "Java & Bedrock" bundle), pick a username — Mojang checks your licence when you press Create.';
   $('nameModal').classList.add('show');
   setTimeout(() => $('nameInput').focus(), 50);
 }
@@ -133,7 +138,7 @@ $('nameInput').oninput = () => {
   }, 500);
 };
 $('nameInput').onkeydown = e => { if (e.key === 'Enter') $('btnNameCreate').click(); };
-$('btnNameLater').onclick = () => $('nameModal').classList.remove('show');
+$('btnNameLater').onclick = () => { demoAccepted = true; $('nameModal').classList.remove('show'); idleLaunch(); };
 $('btnNameCreate').onclick = async () => {
   const b = $('btnNameCreate'); b.disabled = true; $('nameErr').textContent = '';
   try {
@@ -143,19 +148,23 @@ $('btnNameCreate').onclick = async () => {
     toast(`Welcome, ${acc.name}! You now have the full game.`);
   } catch (e) {
     $('nameErr').textContent = String(e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+    const acc = await apex.getAccount();
+    if (acc) setAccount(acc);
   } finally { b.disabled = false; }
 };
 
 function showDemoModal() {
   const a = currentAccount || {};
-  $('demoTitle').textContent = a.status === 'bedrockOnly' ? 'This account only has Minecraft Bedrock' : 'No Minecraft: Java Edition on this account';
+  $('demoTitle').textContent = a.status === 'bedrockOnly' ? 'Mojang says: no Java Edition licence' : 'No Minecraft: Java Edition found';
   $('demoText').textContent = a.status === 'bedrockOnly'
-    ? 'Bedrock Edition (Windows / console / phone) is a different game. The launcher needs Java Edition. "Minecraft: Java & Bedrock Edition for PC" includes both.'
-    : 'Microsoft says this account does not own Minecraft: Java Edition, so the launcher started the free Demo. The most common reasons:';
+    ? 'Mojang refused to create a Java username for this account, so it has no Java Edition licence (Bedrock is a different game). The most common reasons:'
+    : 'Microsoft did not report Minecraft: Java Edition for this account, so the launcher started the free Demo. The most common reasons:';
   $('demoOwns').textContent = a.entitlements && a.entitlements.length ? 'Account owns: ' + a.entitlements.join(', ') : 'Account owns: nothing from Minecraft';
   $('demoModal').classList.add('show');
 }
 $('btnDemoOk').onclick = () => $('demoModal').classList.remove('show');
+$('btnDemoName').onclick = () => { $('demoModal').classList.remove('show'); showNameModal(); };
+$('btnCreateMs').onclick = () => apex.openUrl('https://signup.live.com/');
 $('btnDemoSwitch').onclick = async () => { $('demoModal').classList.remove('show'); await apex.logout(); setAccount(null); showLogin(); };
 
 // ---------------------------------------------------------------- version picker
@@ -249,7 +258,7 @@ async function startGame(server) {
   state = 'preparing';
   setLaunch('PREPARING', server ? `Joining ${server}…` : 'Checking files…', 0, 'busy');
   try {
-    await apex.launch(server ? { server } : {});
+    await apex.launch({ ...(server ? { server } : {}), allowDemo: demoAccepted });
   } catch (e) {
     state = 'idle';
     idleLaunch();

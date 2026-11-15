@@ -365,3 +365,8 @@ input[type=number]::-webkit-inner-spin-button { opacity: .4; }
 .demo-list li { margin-bottom: 6px; }
 .owns { font-size: 11.5px !important; opacity: .7; font-family: Consolas, monospace; }
 #btnWhyDemo:hover { background: rgba(255,185,0,.15) !important; color: #ffcf5c !important; }
+
+.no-acc { margin-top: 16px; font-size: 13px; color: var(--muted); }
+.no-acc small { display: block; font-size: 11.5px; opacity: .8; margin-top: 3px; }
+.linkbtn { color: #9fd8ff; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.linkbtn:hover { color: #fff; }

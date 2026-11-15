@@ -131,6 +131,7 @@ function toAccount(mc) {
     uuid: mc.demo ? null : mc.id,
     demo: mc.demo,
     status: mc.status || (mc.demo ? 'none' : 'ok'),
+    likelyJava: !!mc.likelyJava,
     entitlements: mc.entitlements || []
   };
 }
@@ -192,7 +193,10 @@ ipcMain.handle('account:createProfile', async (_e, name) => {
     account = toAccount(mcAuth);
     logLine(`Created Java username ${account.name}`);
     return account;
-  } catch (e) { const err = niceError(e); logLine('Create username failed: ' + err.message); throw err; }
+  } catch (e) {
+    account = toAccount(mcAuth);   // status may have changed (e.g. Mojang says no Java licence)
+    const err = niceError(e); logLine('Create username failed: ' + err.message); throw err;
+  }
 });
 
 ipcMain.handle('account:logout', () => {
@@ -203,7 +207,7 @@ ipcMain.handle('account:logout', () => {
 ipcMain.handle('game:launch', async (_e, launchOpts = {}) => {
   if (gameProc) throw new Error('Game is already running');
   if (!mcAuth) throw new Error('SIGN_IN');
-  if (mcAuth.status === 'needsName') throw new Error('NEEDS_NAME');
+  if (mcAuth.status === 'needsName' && !launchOpts.allowDemo) throw new Error('NEEDS_NAME');
   // refresh the Minecraft token if it expired while the launcher was open
   if (!isValid(mcAuth)) {
     const token = readToken();

@@ -46,26 +46,33 @@ async function minecraftLogin(xbox) {
   return session;
 }
 
-const JAVA_ITEMS = ['game_minecraft', 'product_minecraft', 'product_game_pass_pc', 'product_game_pass_ultimate'];
-
-/** What the account owns, e.g. ["product_minecraft","game_minecraft"] */
+/** Everything the account owns, from both Mojang lists (the official launcher uses /license). */
 async function entitlements(token) {
-  try {
-    const r = await fetch('https://api.minecraftservices.com/entitlements/mcstore', {
-      headers: { Accept: 'application/json', Authorization: `Bearer ${token}` }
-    });
-    if (!r.ok) return [];
-    const j = await r.json();
-    return (j.items || []).map(i => i.name);
-  } catch (_) { return []; }
+  const names = new Set();
+  const urls = [
+    'https://api.minecraftservices.com/entitlements/mcstore',
+    `https://api.minecraftservices.com/entitlements/license?requestId=${crypto.randomUUID()}`
+  ];
+  for (const url of urls) {
+    try {
+      const r = await fetch(url, { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } });
+      if (!r.ok) continue;
+      const j = await r.json();
+      for (const i of (j.items || [])) if (i && i.name) names.add(i.name);
+    } catch (_) { /* try the other list */ }
+  }
+  return [...names];
 }
+
+const OTHER_GAMES = /bedrock|pocket|win10|dungeons|legends|education|realms/i;
 
 /**
  * Fills session with the Java profile, or explains why there is none:
- *  - status 'ok'          → owns Java and has a username
- *  - status 'needsName'   → owns Java (or Game Pass) but never picked a Java username → can create one
- *  - status 'bedrockOnly' → only Bedrock on this account
- *  - status 'none'        → no Minecraft on this Microsoft account → Demo
+ *  - status 'ok'          → has a Java username
+ *  - status 'needsName'   → owns Java / Game Pass (or a bundle we can't tell apart) → pick a username;
+ *                            Mojang checks the licence itself when the name is created
+ *  - status 'bedrockOnly' → Mojang refused to create a name (no Java licence) — set by createProfile
+ *  - status 'none'        → no Minecraft at all on this Microsoft account → Demo
  */
 async function loadProfile(session) {
   const pr = await fetch('https://api.minecraftservices.com/minecraft/profile', {
@@ -83,9 +90,10 @@ async function loadProfile(session) {
 
   const items = await entitlements(session.accessToken);
   session.entitlements = items;
-  const ownsJava = items.some(n => JAVA_ITEMS.includes(n));
-  const bedrock = items.some(n => /bedrock|pocket|win10/i.test(n));
-  session.status = ownsJava ? 'needsName' : (bedrock ? 'bedrockOnly' : 'none');
+  const anyMinecraft = items.some(n => /minecraft|game_pass/i.test(n));
+  const clearlyJava = items.some(n => /game_pass/i.test(n) || (/minecraft/i.test(n) && !OTHER_GAMES.test(n)));
+  session.likelyJava = clearlyJava;
+  session.status = anyMinecraft ? 'needsName' : 'none';
   session.demo = true;
   session.id = crypto.randomUUID().replace(/-/g, '');
   session.name = 'Player';
@@ -115,7 +123,11 @@ async function createProfile(session, name) {
     body: JSON.stringify({ profileName: name })
   });
   if (!r.ok) {
-    if (r.status === 403) throw new Error('Mojang did not allow creating this name. Open the official Minecraft Launcher once to finish setting up your account.');
+    if (r.status === 403 || r.status === 401) {
+      session.status = 'bedrockOnly';
+      throw new Error('Mojang says this Microsoft account does not own Minecraft: Java Edition (only Bedrock / other games). Sign in with the account that bought Java, or open the official Minecraft Launcher once to finish setting up your purchase.');
+    }
+    if (r.status === 400) throw new Error(`"${name}" can't be used. Try another name.`);
     throw new Error(`Could not create the username (code ${r.status}).`);
   }
   return loadProfile(session);

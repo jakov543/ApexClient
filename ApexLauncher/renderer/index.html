@@ -213,6 +213,10 @@
       Sign in with Microsoft
     </button>
     <div class="login-err" id="loginErr"></div>
+    <div class="no-acc">
+      No Microsoft account? <button class="linkbtn" id="btnCreateMs">Create one for free</button>
+      <small>You can use your Gmail, Outlook or any email address. Minecraft only works with Microsoft accounts.</small>
+    </div>
     <button class="skip" id="btnSkip">Continue without signing in</button>
     <p class="login-note">No Minecraft yet? Sign in anyway to play the free Demo.</p>
   </div>
@@ -222,7 +226,7 @@
   <div class="modal-card ok">
     <div class="modal-ic good">✓</div>
     <h2>You own Minecraft! Pick your username</h2>
-    <p>This account has Minecraft: Java Edition but no username yet. Choose one to get the full game — this is the same as doing it in the official launcher, and you can change it later on minecraft.net.</p>
+    <p id="nameText">This account has Minecraft: Java Edition but no username yet. Choose one to get the full game — this is the same as doing it in the official launcher, and you can change it later on minecraft.net.</p>
     <div class="name-row">
       <input id="nameInput" maxlength="16" placeholder="3–16 letters, numbers or _" spellcheck="false" autocomplete="off">
       <span class="name-st" id="nameSt"></span>
@@ -248,6 +252,7 @@
     <p class="owns" id="demoOwns"></p>
     <div class="modal-btns">
       <button class="ghost" id="btnDemoOk">Play Demo</button>
+      <button class="ghost" id="btnDemoName">I own Java — pick a username</button>
       <button class="primary" id="btnDemoSwitch">Switch account</button>
     </div>
   </div>
