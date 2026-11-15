@@ -227,7 +227,7 @@ async function launchLuanti(launchOpts) {
     game: g.id,
     name,
     server: typeof launchOpts.server === 'string' ? launchOpts.server.trim() : null,
-    helpers: { download: game.download, extract: game.extract },
+    helpers: { downloadAndExtract: game.downloadAndExtract, log: l => send('game:log', '[Launcher] ' + l) },
     onProgress: (text, p) => send('game:progress', { text, p }),
     onLog: line => send('game:log', line),
     onStart: () => {

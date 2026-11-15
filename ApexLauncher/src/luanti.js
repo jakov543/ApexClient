@@ -57,12 +57,7 @@ async function ensureEngine(root, progress, helpers) {
 
   const zip = path.join(base, 'engine-download.zip');
   const tmp = path.join(base, 'engine-tmp');
-  progress(`Downloading Luanti ${latest.tag}`, 0);
-  await helpers.download(latest.url, zip, p => progress(`Downloading Luanti ${latest.tag}`, p));
-  progress('Installing Luanti', 1);
-  await fsp.rm(tmp, { recursive: true, force: true });
-  await helpers.extract(zip, tmp);
-  await fsp.rm(zip, { force: true });
+  await helpers.downloadAndExtract(latest.url, zip, tmp, `Luanti ${latest.tag}`, progress, null, helpers.log);
 
   const exe = findFile(tmp, 'luanti.exe') || findFile(tmp, 'minetest.exe');
   if (!exe) throw new Error('Luanti download looks broken — try again.');
@@ -104,11 +99,7 @@ async function ensureGame(engineDir, gameId, progress, helpers) {
   const base = path.dirname(engineDir);
   const zip = path.join(base, `${g.id}-download.zip`);
   const tmp = path.join(base, `${g.id}-tmp`);
-  await helpers.download(url, zip, p => progress(`Downloading ${g.title}`, p));
-  progress(`Installing ${g.title}`, 1);
-  await fsp.rm(tmp, { recursive: true, force: true });
-  await helpers.extract(zip, tmp);
-  await fsp.rm(zip, { force: true });
+  await helpers.downloadAndExtract(url, zip, tmp, g.title, progress, null, helpers.log);
 
   const conf = findFile(tmp, 'game.conf', 3);
   if (!conf) throw new Error(`${g.title} download looks broken — try again.`);

@@ -1,6 +1,6 @@
 {
   "name": "apex-client-launcher",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Apex Client launcher",
   "main": "main.js",
   "scripts": {

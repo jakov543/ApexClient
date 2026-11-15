@@ -4,7 +4,9 @@ const fsp = fs.promises;
 const path = require('path');
 const { execFile } = require('child_process');
 const crypto = require('crypto');
-const { Readable } = require('stream');
+const https = require('https');
+const http = require('http');
+const zlib = require('zlib');
 const { pipeline } = require('stream/promises');
 const extractZip = require('extract-zip');
 const { Client } = require('minecraft-launcher-core');
@@ -22,22 +24,45 @@ async function getJson(url) {
   return r.json();
 }
 
+/**
+ * Raw HTTP(S) GET that follows redirects and never decompresses on its own.
+ * (fetch() transparently "un-gzips" responses, which broke zips from some servers:
+ *  "invalid stored block lengths".)
+ */
+function httpGet(url, redirects = 0) {
+  return new Promise((resolve, reject) => {
+    const lib = url.startsWith('https:') ? https : http;
+    const req = lib.get(url, { headers: { ...UA, 'Accept-Encoding': 'identity', Accept: '*/*' } }, res => {
+      if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
+        res.resume();
+        if (redirects > 8) return reject(new Error('Too many redirects'));
+        return resolve(httpGet(new URL(res.headers.location, url).toString(), redirects + 1));
+      }
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error(`server answered ${res.statusCode}`)); }
+      resolve(res);
+    });
+    req.on('error', reject);
+    req.setTimeout(60000, () => req.destroy(new Error('connection timed out')));
+  });
+}
+
 async function download(url, dest, onProgress, sha256) {
   let lastErr;
   for (let attempt = 1; attempt <= 3; attempt++) {
     const tmp = dest + '.part';
     try {
-      const r = await fetch(url, { headers: UA, redirect: 'follow' });
-      if (!r.ok) throw new Error(`Download failed (${r.status}): ${url}`);
-      const total = Number(r.headers.get('content-length')) || 0;
+      const res = await httpGet(url);
+      const enc = String(res.headers['content-encoding'] || 'identity').toLowerCase();
+      const total = enc === 'identity' ? Number(res.headers['content-length']) || 0 : 0;
       let done = 0;
       const hash = crypto.createHash('sha256');
       await fsp.mkdir(path.dirname(dest), { recursive: true });
-      const body = Readable.fromWeb(r.body);
+      // if a server compresses anyway, undo it properly instead of saving garbage
+      const body = /gzip|deflate|br/.test(enc) ? res.pipe(enc.includes('br') ? zlib.createBrotliDecompress() : zlib.createUnzip()) : res;
       body.on('data', c => { done += c.length; hash.update(c); if (total && onProgress) onProgress(done / total); });
       await pipeline(body, fs.createWriteStream(tmp));
-      if (total && done !== total) throw new Error('Download was cut off');
-      if (sha256 && hash.digest('hex') !== sha256.toLowerCase()) throw new Error('Downloaded file is corrupted');
+      if (total && done !== total) throw new Error('download was cut off');
+      if (sha256 && hash.digest('hex') !== sha256.toLowerCase()) throw new Error('downloaded file is corrupted');
       await fsp.rename(tmp, dest);
       return;
     } catch (e) {
@@ -47,6 +72,42 @@ async function download(url, dest, onProgress, sha256) {
     }
   }
   throw lastErr;
+}
+
+/** true if the file starts like a zip ("PK") or gzip */
+async function looksLikeArchive(file) {
+  const fh = await fsp.open(file, 'r');
+  try {
+    const b = Buffer.alloc(4);
+    await fh.read(b, 0, 4, 0);
+    return (b[0] === 0x50 && b[1] === 0x4b) || (b[0] === 0x1f && b[1] === 0x8b);
+  } finally { await fh.close(); }
+}
+
+/**
+ * Download + check + unpack, with one full retry if anything is damaged.
+ * label is used in progress text and error messages ("Java 21", "Luanti", "Mineclonia"...).
+ */
+async function downloadAndExtract(url, archive, dest, label, progress, sha256, log = () => {}) {
+  let lastErr;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      progress(`Downloading ${label}`, 0);
+      await download(url, archive, p => progress(`Downloading ${label}`, p), sha256);
+      if (!await looksLikeArchive(archive)) throw new Error('the server sent a web page instead of the file');
+      progress(`Installing ${label} (this can take a minute)`, 1);
+      await fsp.rm(dest, { recursive: true, force: true });
+      await extract(archive, dest, log);
+      await fsp.rm(archive, { force: true });
+      return;
+    } catch (e) {
+      lastErr = e;
+      log(`${label}: attempt ${attempt} failed — ${e.message}`);
+      await fsp.rm(archive, { force: true }).catch(() => {});
+      await fsp.rm(dest, { recursive: true, force: true }).catch(() => {});
+    }
+  }
+  throw new Error(`Could not install ${label}: ${lastErr.message}. Check your internet connection and press Launch again.`);
 }
 
 const run = (file, args, opts = {}) => new Promise((res, rej) =>
@@ -122,12 +183,7 @@ async function ensureJava(root, progress, major = 21, log = () => {}) {
   const ext = pkg.name.endsWith('.zip') ? 'zip' : 'tar.gz';
   const archive = path.join(root, 'runtime', `java${major}-download.${ext}`);
 
-  progress(`Downloading Java ${major}`, 0);
-  await download(pkg.link, archive, p => progress(`Downloading Java ${major}`, p), pkg.checksum);
-  progress(`Installing Java ${major}`, 1);
-  progress(`Installing Java ${major} (this can take a minute)`, 1);
-  await extract(archive, runtime, log);
-  await fsp.rm(archive, { force: true });
+  await downloadAndExtract(pkg.link, archive, runtime, `Java ${major}`, progress, pkg.checksum, log);
 
   java = findFile(runtime, exe);
   if (java && process.platform !== 'win32') await fsp.chmod(java, 0o755);
@@ -308,4 +364,4 @@ async function launch(opts) {
   return proc;
 }
 
-module.exports = { launch, gameDir, listVersions, download, extract };
+module.exports = { launch, gameDir, listVersions, download, extract, downloadAndExtract };
