@@ -4,6 +4,8 @@ import com.apexclient.module.TextHudModule;
 import net.minecraft.client.MinecraftClient;
 
 public class CoordinatesModule extends TextHudModule {
+    public final com.apexclient.module.Setting.Bool showDir = add(new com.apexclient.module.Setting.Bool("Show direction", true));
+
     public CoordinatesModule() { super("Coordinates", "Your X Y Z and facing direction", true, 4, 40); }
 
     @Override
@@ -12,7 +14,7 @@ public class CoordinatesModule extends TextHudModule {
         String dir = switch (mc.player.getHorizontalFacing()) {
             case NORTH -> "N"; case SOUTH -> "S"; case EAST -> "E"; case WEST -> "W"; default -> "?";
         };
-        return String.format("X %d  Y %d  Z %d  (%s)",
-                mc.player.getBlockX(), mc.player.getBlockY(), mc.player.getBlockZ(), dir);
+        String xyz = String.format("X %d  Y %d  Z %d", mc.player.getBlockX(), mc.player.getBlockY(), mc.player.getBlockZ());
+        return showDir.value ? xyz + "  (" + dir + ")" : xyz;
     }
 }

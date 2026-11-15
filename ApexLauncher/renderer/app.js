@@ -22,9 +22,9 @@ const MODS = [
 ];
 
 const NEWS = [
+  { tag: 'v1.4', t: 'New in-game menus', p: 'Brand-new main menu and Right Shift mod menu with profiles, search, and OPTIONS for every mod (1.21.1).' },
   { tag: 'v1.3', t: 'New look & Discord status', p: 'Fresh logo, Rich Presence on every version, and Java 25 support for the newest Minecraft.' },
   { tag: 'NEW', t: 'Every version, 1.8 → latest', p: 'Pick any version next to Launch. 1.21.1 has all Apex mods, other versions get Fabric + Sodium.' },
-  { tag: 'v1.2', t: 'Servers & screenshots', p: 'Join servers in one click, see who is online, and browse your F2 screenshots right here.' },
 
 ];
 

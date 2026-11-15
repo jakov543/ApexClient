@@ -21,12 +21,14 @@ public abstract class GameRendererMixin {
     @Inject(method = "getFov", at = @At("RETURN"), cancellable = true)
     private void apexclient$zoom(Camera camera, float tickDelta, boolean changingFov, CallbackInfoReturnable<Double> cir) {
         if (!changingFov) return; // hand rendering uses the un-zoomed fov
+        ZoomModule zoom = ModuleManager.get(ZoomModule.class);
         boolean zooming = ApexClient.zoomKey != null && ApexClient.zoomKey.isPressed()
                 && MinecraftClient.getInstance().currentScreen == null
-                && ModuleManager.get(ZoomModule.class).isEnabled();
-        apexclient$zoomProgress += ((zooming ? 1 : 0) - apexclient$zoomProgress) * 0.25;
+                && zoom.isEnabled();
+        double target = zooming ? 1 : 0;
+        apexclient$zoomProgress = zoom.smooth.value ? apexclient$zoomProgress + (target - apexclient$zoomProgress) * 0.25 : target;
         if (apexclient$zoomProgress < 0.001) return;
         double fov = cir.getReturnValue();
-        cir.setReturnValue(fov + (Math.min(fov, ZoomModule.zoomFov) - fov) * apexclient$zoomProgress);
+        cir.setReturnValue(fov + (Math.min(fov, zoom.fov.value) - fov) * apexclient$zoomProgress);
     }
 }

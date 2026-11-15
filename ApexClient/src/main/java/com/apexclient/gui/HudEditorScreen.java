@@ -41,13 +41,14 @@ public class HudEditorScreen extends Screen {
 
         for (HudModule h : enabled()) {
             h.clamp(width, height, client);
-            h.draw(ctx, client, h.x, h.y, true);
+            h.renderScaled(ctx, client, true);
             boolean hover = h == dragging || hit(h, mouseX, mouseY);
-            ModMenuScreen.drawBorder(ctx, h.x - 1, h.y - 1, h.getWidth(client) + 2, h.getHeight(client) + 2,
-                    hover ? 0xFF22E3FF : 0x807B5CFF);
+            Ui.border(ctx, h.x - 1, h.y - 1, h.scaledWidth(client) + 2, h.scaledHeight(client) + 2,
+                    hover ? 0xFF2EE6FF : 0x807C5CFF);
+            if (hover) ctx.drawText(textRenderer, h.getName(), h.x, Math.max(0, h.y - 10), 0xFFFFFFFF, true);
         }
 
-        String hint = "Drag elements to move them  •  ESC to save";
+        String hint = "Drag to move  •  Right-click for options  •  ESC to save";
         int w = textRenderer.getWidth(hint) + 16;
         ctx.fill(width / 2 - w / 2, height - 24, width / 2 + w / 2, height - 8, 0xC0100A1E);
         ctx.drawCenteredTextWithShadow(textRenderer, hint, width / 2, height - 20, 0xFFFFFFFF);
@@ -58,12 +59,17 @@ public class HudEditorScreen extends Screen {
     }
 
     private boolean hit(HudModule h, double mx, double my) {
-        return mx >= h.x && mx < h.x + h.getWidth(client) && my >= h.y && my < h.y + h.getHeight(client);
+        return mx >= h.x && mx < h.x + h.scaledWidth(client) && my >= h.y && my < h.y + h.scaledHeight(client);
     }
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
         List<HudModule> list = enabled();
+        if (button == 1) {
+            for (int i = list.size() - 1; i >= 0; i--) {
+                if (hit(list.get(i), mx, my)) { client.setScreen(new ModuleOptionsScreen(this, list.get(i))); return true; }
+            }
+        }
         for (int i = list.size() - 1; i >= 0; i--) {
             HudModule h = list.get(i);
             if (hit(h, mx, my)) {
@@ -79,7 +85,7 @@ public class HudEditorScreen extends Screen {
     @Override
     public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
         if (dragging == null) return super.mouseDragged(mx, my, button, dx, dy);
-        int w = dragging.getWidth(client), h = dragging.getHeight(client);
+        int w = dragging.scaledWidth(client), h = dragging.scaledHeight(client);
         int nx = (int) mx - offX, ny = (int) my - offY;
 
         // snap to edges and center

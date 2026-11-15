@@ -17,9 +17,10 @@ public abstract class PlayerCapeMixin {
     @Inject(method = "getSkinTextures", at = @At("RETURN"), cancellable = true)
     private void apexclient$cape(CallbackInfoReturnable<SkinTextures> cir) {
         if ((Object) this != MinecraftClient.getInstance().player) return;
-        if (!ModuleManager.get(CapeModule.class).isEnabled()) return;
+        CapeModule cape = ModuleManager.get(CapeModule.class);
+        if (!cape.isEnabled()) return;
         SkinTextures s = cir.getReturnValue();
         cir.setReturnValue(new SkinTextures(s.texture(), s.textureUrl(), CapeModule.CAPE,
-                s.elytraTexture(), s.model(), s.secure()));
+                cape.elytra.value ? CapeModule.CAPE : s.elytraTexture(), s.model(), s.secure()));
     }
 }

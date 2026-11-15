@@ -13,6 +13,8 @@ import java.util.List;
 /** Active potion effects with icon and time left. */
 public class PotionEffectsModule extends HudModule {
 
+    public final com.apexclient.module.Setting.Bool showIcons = add(new com.apexclient.module.Setting.Bool("Show icons", true));
+
     public PotionEffectsModule() { super("Potion Effects", "Active effects with time left", true, 4, 290); }
 
     private List<StatusEffectInstance> effects(MinecraftClient mc) {
@@ -30,7 +32,7 @@ public class PotionEffectsModule extends HudModule {
         List<StatusEffectInstance> list = effects(mc);
         if (list.isEmpty()) {
             if (preview) {
-                ctx.fill(x, y, x + getWidth(mc), y + 20, BG);
+                if (background.value) ctx.fill(x, y, x + getWidth(mc), y + 20, BG);
                 ctx.drawTextWithShadow(mc.textRenderer, "Speed II", x + 22, y + 2, 0xFFFFFFFF);
                 ctx.drawTextWithShadow(mc.textRenderer, "1:30", x + 22, y + 11, 0xFFB9A8FF);
             }
@@ -38,14 +40,14 @@ public class PotionEffectsModule extends HudModule {
         }
         int ry = y;
         for (StatusEffectInstance e : list) {
-            ctx.fill(x, ry, x + getWidth(mc), ry + 20, BG);
+            if (background.value) ctx.fill(x, ry, x + getWidth(mc), ry + 20, BG);
             Sprite sprite = mc.getStatusEffectSpriteManager().getSprite(e.getEffectType());
-            ctx.drawSprite(x + 2, ry + 1, 0, 18, 18, sprite);
+            if (showIcons.value) ctx.drawSprite(x + 2, ry + 1, 0, 18, 18, sprite);
             String name = e.getEffectType().value().getName().getString();
             if (e.getAmplifier() > 0) name += " " + roman(e.getAmplifier() + 1);
             String time = e.isInfinite() ? "**:**" : StringHelper.formatTicks(e.getDuration(), mc.world != null ? mc.world.getTickManager().getTickRate() : 20f);
-            ctx.drawTextWithShadow(mc.textRenderer, name, x + 22, ry + 2, 0xFFFFFFFF);
-            ctx.drawTextWithShadow(mc.textRenderer, time, x + 22, ry + 11, 0xFFB9A8FF);
+            ctx.drawTextWithShadow(mc.textRenderer, name, x + (showIcons.value ? 22 : 4), ry + 2, textColor.color(ry));
+            ctx.drawTextWithShadow(mc.textRenderer, time, x + (showIcons.value ? 22 : 4), ry + 11, 0xFFB9A8FF);
             ry += 20;
         }
     }

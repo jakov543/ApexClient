@@ -21,10 +21,23 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Build mod
         working-directory: ApexClient
+        shell: bash
         run: |
           chmod +x gradlew
-          ./gradlew build --no-daemon
+          set -o pipefail
+          ./gradlew build --no-daemon 2>&1 | tee build.log
           cp build/libs/ApexClient-*[0-9].jar ../ApexClient.jar
+      - name: Report compile errors
+        if: failure()
+        working-directory: ApexClient
+        shell: bash
+        run: |
+          # one annotation per Java error (file:line + message + code line), readable without logs access
+          grep -nE "\.java:[0-9]+: error:" build.log | head -10 | while IFS= read -r hit; do
+            n=${hit%%:*}; msg=$(sed -n "${n},$((n+2))p" build.log | sed 's/%/%25/g' | tr '\n' ' ')
+            echo "::error title=javac::${msg}"
+          done
+          grep -E "What went wrong|Could not|> " build.log | head -8 | while IFS= read -r l; do echo "::error title=gradle::${l}"; done
       - uses: actions/upload-artifact@v4
         with:
           name: mod

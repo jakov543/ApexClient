@@ -24,9 +24,10 @@ public abstract class MouseMixin {
     @Inject(method = "onMouseScroll", at = @At("HEAD"), cancellable = true)
     private void apexclient$zoomScroll(long window, double horizontal, double vertical, CallbackInfo ci) {
         MinecraftClient mc = MinecraftClient.getInstance();
+        ZoomModule zoom = ModuleManager.get(ZoomModule.class);
         if (mc.currentScreen == null && ApexClient.zoomKey != null && ApexClient.zoomKey.isPressed()
-                && ModuleManager.get(ZoomModule.class).isEnabled()) {
-            ZoomModule.zoomFov = Math.max(2.0, Math.min(50.0, ZoomModule.zoomFov - vertical * 2.0));
+                && zoom.isEnabled() && zoom.scroll.value) {
+            zoom.fov.set(zoom.fov.value - vertical * 2.0);
             ci.cancel();
         }
     }

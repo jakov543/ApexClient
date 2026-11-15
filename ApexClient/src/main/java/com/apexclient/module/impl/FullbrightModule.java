@@ -9,7 +9,12 @@ public class FullbrightModule extends Module {
 
     private double previousGamma = 0.5;
 
-    public FullbrightModule() { super("Fullbright", "See clearly in caves and at night", Category.VISUAL, false); }
+    public final com.apexclient.module.Setting.Slider level = add(new com.apexclient.module.Setting.Slider("Brightness", 2, 16, 1, 16, "x"));
+
+    public FullbrightModule() {
+        super("Fullbright", "See clearly in caves and at night", Category.VISUAL, false);
+        level.onChange(() -> { if (isEnabled()) apply(); });
+    }
 
     @Override
     protected void onEnable() { apply(); }
@@ -22,7 +27,7 @@ public class FullbrightModule extends Module {
         MinecraftClient mc = MinecraftClient.getInstance();
         double now = mc.options.getGamma().getValue();
         if (now <= 1.0) previousGamma = now;
-        ((SimpleOptionAccessor<Double>) (Object) mc.options.getGamma()).apexclient$setValue(16.0);
+        ((SimpleOptionAccessor<Double>) (Object) mc.options.getGamma()).apexclient$setValue(level.value);
     }
 
     @SuppressWarnings("unchecked")

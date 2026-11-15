@@ -23,6 +23,7 @@ public final class ApexConfig {
     public static String buttonLabel = "Get Apex Client";
     public static String buttonUrl = "https://github.com/jakov543/ApexClient/releases/latest";
     public static boolean customMainMenu = true;
+    public static boolean hudInDebug = false;
 
     private static Path file() {
         return FabricLoader.getInstance().getConfigDir().resolve("apexclient.properties");
@@ -44,6 +45,7 @@ public final class ApexConfig {
         buttonLabel = p.getProperty("discord.buttonLabel", buttonLabel);
         buttonUrl = p.getProperty("discord.buttonUrl", buttonUrl).trim();
         customMainMenu = bool(p, "client.customMainMenu", customMainMenu);
+        hudInDebug = bool(p, "client.hudInDebug", hudInDebug);
         save();
     }
 
@@ -57,6 +59,7 @@ public final class ApexConfig {
         p.setProperty("discord.buttonLabel", buttonLabel);
         p.setProperty("discord.buttonUrl", buttonUrl);
         p.setProperty("client.customMainMenu", String.valueOf(customMainMenu));
+        p.setProperty("client.hudInDebug", String.valueOf(hudInDebug));
         try (Writer w = Files.newBufferedWriter(file())) {
             p.store(w, "Apex Client settings");
         } catch (IOException e) {

@@ -10,13 +10,16 @@ public class KeystrokesModule extends HudModule {
 
     private static final int KEY = 22, GAP = 2;
 
+    public final com.apexclient.module.Setting.Bool showMouse = add(new com.apexclient.module.Setting.Bool("Show mouse buttons", true));
+    public final com.apexclient.module.Setting.Bool showSpace = add(new com.apexclient.module.Setting.Bool("Show space bar", true));
+
     public KeystrokesModule() { super("Keystrokes", "Shows WASD, mouse buttons and CPS", true, 4, 120); }
 
     @Override
     public int getWidth(MinecraftClient mc) { return KEY * 3 + GAP * 2; }
 
     @Override
-    public int getHeight(MinecraftClient mc) { return KEY * 3 + GAP * 3 + 12; }
+    public int getHeight(MinecraftClient mc) { return KEY * 2 + GAP + (showMouse.value ? KEY + GAP : 0) + (showSpace.value ? 12 + GAP : 0); }
 
     @Override
     public void draw(DrawContext ctx, MinecraftClient mc, int x, int y, boolean preview) {
@@ -29,24 +32,27 @@ public class KeystrokesModule extends HudModule {
 
         int half = (full - GAP) / 2;
         int my = y + (KEY + GAP) * 2;
-        box(ctx, mc, "LMB", CpsModule.left() + " CPS", o.attackKey.isPressed(), x, my, half, KEY);
-        box(ctx, mc, "RMB", CpsModule.right() + " CPS", o.useKey.isPressed(), x + half + GAP, my, full - half - GAP, KEY);
-
-        int sy = my + KEY + GAP;
+        if (showMouse.value) {
+            box(ctx, mc, "LMB", CpsModule.left() + " CPS", o.attackKey.isPressed(), x, my, half, KEY);
+            box(ctx, mc, "RMB", CpsModule.right() + " CPS", o.useKey.isPressed(), x + half + GAP, my, full - half - GAP, KEY);
+            my += KEY + GAP;
+        }
+        if (!showSpace.value) return;
+        int sy = my;
         boolean space = o.jumpKey.isPressed();
-        ctx.fill(x, sy, x + full, sy + 12, space ? 0xD0FFFFFF : BG);
-        ctx.fill(x + full / 2 - 12, sy + 5, x + full / 2 + 12, sy + 7, space ? 0xFF000000 : 0xFFFFFFFF);
+        ctx.fill(x, sy, x + full, sy + 12, space ? 0xD0FFFFFF : bg());
+        ctx.fill(x + full / 2 - 12, sy + 5, x + full / 2 + 12, sy + 7, space ? 0xFF000000 : textColor.color(x));
     }
 
-    private static void key(DrawContext ctx, MinecraftClient mc, String label, KeyBinding bind, int x, int y, int w, int h) {
+    private void key(DrawContext ctx, MinecraftClient mc, String label, KeyBinding bind, int x, int y, int w, int h) {
         boolean down = bind.isPressed();
-        ctx.fill(x, y, x + w, y + h, down ? 0xD0FFFFFF : BG);
-        ctx.drawCenteredTextWithShadow(mc.textRenderer, label, x + w / 2, y + (h - 8) / 2, down ? 0xFF000000 : 0xFFFFFFFF);
+        ctx.fill(x, y, x + w, y + h, down ? 0xD0FFFFFF : bg());
+        ctx.drawCenteredTextWithShadow(mc.textRenderer, label, x + w / 2, y + (h - 8) / 2, down ? 0xFF000000 : textColor.color(x + y));
     }
 
-    private static void box(DrawContext ctx, MinecraftClient mc, String top, String bottom, boolean down, int x, int y, int w, int h) {
-        ctx.fill(x, y, x + w, y + h, down ? 0xD0FFFFFF : BG);
-        int c = down ? 0xFF000000 : 0xFFFFFFFF;
+    private void box(DrawContext ctx, MinecraftClient mc, String top, String bottom, boolean down, int x, int y, int w, int h) {
+        ctx.fill(x, y, x + w, y + h, down ? 0xD0FFFFFF : bg());
+        int c = down ? 0xFF000000 : textColor.color(x + y);
         ctx.getMatrices().push();
         ctx.getMatrices().translate(x + w / 2f, y + 3, 0);
         ctx.drawCenteredTextWithShadow(mc.textRenderer, top, 0, 0, c);

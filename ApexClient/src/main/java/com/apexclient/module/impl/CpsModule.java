@@ -12,6 +12,8 @@ public class CpsModule extends TextHudModule {
     private static final Deque<Long> LEFT = new ArrayDeque<>();
     private static final Deque<Long> RIGHT = new ArrayDeque<>();
 
+    public final com.apexclient.module.Setting.Bool showRight = add(new com.apexclient.module.Setting.Bool("Show right click", true));
+
     public CpsModule() { super("CPS", "Clicks per second (left | right)", true, 4, 22); }
 
     public static void click(int button) {
@@ -31,6 +33,6 @@ public class CpsModule extends TextHudModule {
 
     @Override
     protected String getText(MinecraftClient mc, boolean preview) {
-        return left() + " | " + right() + " CPS";
+        return showRight.value ? left() + " | " + right() + " CPS" : left() + " CPS";
     }
 }

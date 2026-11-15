@@ -1,22 +1,21 @@
 package com.apexclient.gui;
 
 import com.apexclient.ApexClient;
-import com.mojang.blaze3d.systems.RenderSystem;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen;
+import net.minecraft.client.gui.screen.option.AccessibilityOptionsScreen;
 import net.minecraft.client.gui.screen.option.LanguageOptionsScreen;
 import net.minecraft.client.gui.screen.option.OptionsScreen;
 import net.minecraft.client.gui.screen.world.SelectWorldScreen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.util.Util;
 
-/** Apex Client main menu — replaces the vanilla title screen. */
+import java.io.File;
+
+/** Apex Client main menu — replaces the vanilla title screen (blurred panorama, logo, see-through buttons, icon bar). */
 public class ApexMenuScreen extends Screen {
-
-    private static final Identifier LOGO = Identifier.of(ApexClient.MOD_ID, "textures/gui/logo.png");
-    private static final int LOGO_TEX_W = 720, LOGO_TEX_H = 256;
 
     private long openedAt;
 
@@ -27,55 +26,77 @@ public class ApexMenuScreen extends Screen {
     @Override
     protected void init() {
         openedAt = System.currentTimeMillis();
-        int cx = this.width / 2;
-        int y = this.height / 2 - 4;
-        int w = 200;
+        int cx = width / 2;
+        int bw = Math.min(220, width - 40), bh = 20;
+        int top = height / 2 - 4;
 
-        addDrawableChild(ButtonWidget.builder(Text.translatable("menu.singleplayer"),
-                b -> client.setScreen(new SelectWorldScreen(this))).dimensions(cx - w / 2, y, w, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.translatable("menu.multiplayer"),
-                b -> client.setScreen(new MultiplayerScreen(this))).dimensions(cx - w / 2, y + 24, w, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.translatable("menu.options"),
-                b -> client.setScreen(new OptionsScreen(this, client.options))).dimensions(cx - w / 2, y + 48, w / 2 - 2, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.translatable("options.language"),
-                b -> client.setScreen(new LanguageOptionsScreen(this, client.options, client.getLanguageManager())))
-                .dimensions(cx + 2, y + 48, w / 2 - 2, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Apex Mods"),
-                b -> client.setScreen(new ModMenuScreen(this))).dimensions(cx - w / 2, y + 72, w / 2 - 2, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.translatable("menu.quit"),
-                b -> client.scheduleStop()).dimensions(cx + 2, y + 72, w / 2 - 2, 20).build());
+        addDrawableChild(new ApexButton(cx - bw / 2, top, bw, bh, "Singleplayer", ApexButton.Style.NORMAL,
+                b -> client.setScreen(new SelectWorldScreen(this))));
+        addDrawableChild(new ApexButton(cx - bw / 2, top + 25, bw, bh, "Multiplayer", ApexButton.Style.NORMAL,
+                b -> client.setScreen(new MultiplayerScreen(this))));
+        addDrawableChild(new ApexButton(cx - bw / 2, top + 50, bw, bh, "Apex Mods", ApexButton.Style.ACCENT,
+                b -> client.setScreen(new ModMenuScreen(this))));
+
+        // bottom icon bar
+        int s = 20, gap = 5, n = 6;
+        int bx = cx - (n * s + (n - 1) * gap) / 2, by = height - s - 12;
+        addDrawableChild(new ApexButton(bx, by, s, Ui.icon("ui_gear"), "Options",
+                b -> client.setScreen(new OptionsScreen(this, client.options))));
+        addDrawableChild(new ApexButton(bx + (s + gap), by, s, Ui.icon("ui_globe"), "Language",
+                b -> client.setScreen(new LanguageOptionsScreen(this, client.options, client.getLanguageManager()))));
+        addDrawableChild(new ApexButton(bx + (s + gap) * 2, by, s, Ui.icon("ui_person"), "Accessibility",
+                b -> client.setScreen(new AccessibilityOptionsScreen(this, client.options))));
+        addDrawableChild(new ApexButton(bx + (s + gap) * 3, by, s, Ui.icon("ui_camera"), "Screenshots folder",
+                b -> openFolder(new File(client.runDirectory, "screenshots"))));
+        addDrawableChild(new ApexButton(bx + (s + gap) * 4, by, s, Ui.icon("ui_folder"), "Mods folder",
+                b -> openFolder(FabricLoader.getInstance().getGameDir().resolve("mods").toFile())));
+        addDrawableChild(new ApexButton(bx + (s + gap) * 5, by, s, Ui.icon("ui_power"), "Quit game",
+                b -> client.scheduleStop()));
+    }
+
+    private static void openFolder(File dir) {
+        if (!dir.exists()) dir.mkdirs();
+        Util.getOperatingSystem().open(dir);
     }
 
     @Override
     public void renderBackground(DrawContext ctx, int mouseX, int mouseY, float delta) {
         super.renderBackground(ctx, mouseX, mouseY, delta); // vanilla panorama + blur
-        ctx.fillGradient(0, 0, width, height, 0xB0120A24, 0xE0080512);
-        // accent line at the bottom
-        ctx.fillGradient(0, height - 2, width, height, 0xFF22E3FF, 0xFFD24BFF);
+        ctx.fillGradient(0, 0, width, height, 0x400C0820, 0x9A06040E);
     }
 
     @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
         super.render(ctx, mouseX, mouseY, delta);
 
-        // logo with a soft fade-in + gentle float
         float t = (System.currentTimeMillis() - openedAt) / 1000f;
-        float alpha = Math.min(1f, t / 0.6f);
-        int logoW = Math.min(300, width - 40);
-        int logoH = logoW * LOGO_TEX_H / LOGO_TEX_W;
-        int lx = (width - logoW) / 2;
-        int ly = height / 2 - 18 - logoH + (int) (Math.sin(t * 1.6f) * 2);
+        float a = Math.min(1f, t / 0.5f);
+        int alpha = (int) (a * 255) << 24;
 
-        RenderSystem.enableBlend();
-        ctx.setShaderColor(1f, 1f, 1f, alpha);
-        ctx.drawTexture(LOGO, lx, ly, 0, 0, logoW, logoH, logoW, logoH);
-        ctx.setShaderColor(1f, 1f, 1f, 1f);
-        RenderSystem.disableBlend();
+        // logo + name
+        int cx = width / 2;
+        int logo = Math.min(64, height / 6);
+        int ly = height / 2 - 4 - 34 - logo + (int) (Math.sin(t * 1.4f) * 1.5f);
+        Ui.texture(ctx, Ui.EMBLEM, cx - logo / 2, ly, logo, logo, alpha | 0xFFFFFF);
+        String title = "APEX CLIENT";
+        float sc = 1.6f;
+        int tw = (int) (Ui.spacedWidth(textRenderer, title, 1) * sc);
+        ctx.getMatrices().push();
+        ctx.getMatrices().translate(cx - tw / 2f, ly + logo + 7, 0);
+        ctx.getMatrices().scale(sc, sc, 1f);
+        int x = 0;
+        for (char ch : title.toCharArray()) {
+            String c = String.valueOf(ch);
+            ctx.drawText(textRenderer, c, x, 0, alpha | 0xFFFFFF, true);
+            x += textRenderer.getWidth(c) + 1;
+        }
+        ctx.getMatrices().pop();
 
-        ctx.drawTextWithShadow(textRenderer, ApexClient.NAME + " " + ApexClient.VERSION + " • Minecraft 1.21.1",
-                4, height - 12, 0xFFB9A8FF);
+        // footer
+        String ver = ApexClient.NAME + " " + ApexClient.VERSION + " · Minecraft 1.21.1";
+        ctx.drawText(textRenderer, ver, 6, height - 12, 0xB0B4ADCF, true);
         String user = client.getSession().getUsername();
-        ctx.drawTextWithShadow(textRenderer, user, width - textRenderer.getWidth(user) - 4, height - 12, 0xFFFFFFFF);
+        ctx.drawText(textRenderer, user, width - textRenderer.getWidth(user) - 6, height - 12, 0xB0FFFFFF, true);
     }
 
     @Override
