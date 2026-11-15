@@ -12,13 +12,22 @@ let win;
 let account = null;        // { name, uuid }
 let mcAuth = null;         // msmc Minecraft object
 let gameProc = null;
+let sessionStart = 0;
 const auth = new Auth('select_account');
 const rpc = new DiscordRPC(cfg.DISCORD_CLIENT_ID);
 const launcherStart = Math.floor(Date.now() / 1000);
 
 // ---------------------------------------------------------------- settings
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
-const defaults = { ramMb: Math.max(2048, Math.floor(Math.min(4096, os.totalmem() / 1048576 / 2) / 256) * 256), closeOnLaunch: false, discordRpc: true, version: cfg.MC_VERSION, token: null };
+const defaults = { ramMb: Math.max(2048, Math.floor(Math.min(4096, os.totalmem() / 1048576 / 2) / 256) * 256), closeOnLaunch: false, discordRpc: true, version: cfg.MC_VERSION,
+  fullscreen: false, width: 1280, height: 720, jvmArgs: '',
+  servers: [
+    { name: 'Hypixel', address: 'mc.hypixel.net' },
+    { name: 'CubeCraft', address: 'play.cubecraft.net' },
+    { name: 'Wynncraft', address: 'play.wynncraft.com' }
+  ],
+  stats: { totalMs: 0, launches: 0, lastPlayed: null, lastVersion: null, lastServer: null },
+  token: null };
 let settings = { ...defaults };
 
 function loadSettings() {
@@ -152,7 +161,7 @@ ipcMain.handle('account:logout', () => {
   return true;
 });
 
-ipcMain.handle('game:launch', async () => {
+ipcMain.handle('game:launch', async (_e, launchOpts = {}) => {
   if (gameProc) throw new Error('Game is already running');
   if (!mcAuth) throw new Error('SIGN_IN');
   // refresh the Minecraft token if it expired while the launcher was open
@@ -173,17 +182,31 @@ ipcMain.handle('game:launch', async () => {
     auth: toMclc(mcAuth),
     version: settings.version || cfg.MC_VERSION,
     ramMb: settings.ramMb,
+    server: typeof launchOpts.server === 'string' ? launchOpts.server.trim() : null,
+    window: { width: settings.width, height: settings.height, fullscreen: settings.fullscreen },
+    jvmArgs: settings.jvmArgs,
     bundledModsDir,
     onProgress: (text, p) => send('game:progress', { text, p }),
     onLog: line => send('game:log', line),
     onStart: () => {
+      sessionStart = Date.now();
+      settings.stats = { ...defaults.stats, ...settings.stats };
+      settings.stats.launches++;
+      settings.stats.lastPlayed = Date.now();
+      settings.stats.lastVersion = settings.version;
+      settings.stats.lastServer = launchOpts.server || null;
+      saveSettings();
       send('game:state', 'running');
       if (settings.closeOnLaunch) win.hide();
     },
     onClose: code => {
       gameProc = null;
-      send('game:state', code === 0 ? 'closed' : 'crashed');
-      if (settings.closeOnLaunch || !win || win.isDestroyed()) { rpc.stop(); app.quit(); return; }
+      if (sessionStart) { settings.stats.totalMs += Date.now() - sessionStart; sessionStart = 0; saveSettings(); }
+      const crashed = code !== 0 && code !== null;
+      if (!win || win.isDestroyed()) { rpc.stop(); app.quit(); return; }
+      if (settings.closeOnLaunch && !crashed) { rpc.stop(); app.quit(); return; }
+      if (!win.isVisible()) win.show();           // show the launcher again so a crash can be read
+      send('game:state', crashed ? 'crashed' : 'closed');
       if (settings.discordRpc) launcherPresence();
     }
   });
@@ -199,3 +222,43 @@ ipcMain.handle('open:folder', () => {
 ipcMain.handle('open:url', (_e, url) => {
   if (/^https:\/\//.test(url)) shell.openExternal(url);
 });
+
+// ---------------------------------------------------------------- screenshots / logs / repair
+const inside = (base, p) => { const r = path.relative(base, p); return r && !r.startsWith('..') && !path.isAbsolute(r); };
+
+ipcMain.handle('shots:list', () => {
+  const inst = path.join(game.gameDir(app), 'instances');
+  const out = [];
+  if (!fs.existsSync(inst)) return out;
+  for (const v of fs.readdirSync(inst)) {
+    const dir = path.join(inst, v, 'screenshots');
+    if (!fs.existsSync(dir)) continue;
+    for (const f of fs.readdirSync(dir)) {
+      if (!/\.png$/i.test(f)) continue;
+      const full = path.join(dir, f);
+      out.push({ path: full, url: 'file:///' + full.replace(/\\/g, '/').replace(/^\//, ''), version: v, name: f, time: fs.statSync(full).mtimeMs });
+    }
+  }
+  return out.sort((a, b) => b.time - a.time).slice(0, 200);
+});
+ipcMain.handle('shots:open', (_e, p) => { if (inside(game.gameDir(app), p)) shell.openPath(p); });
+ipcMain.handle('shots:folder', () => {
+  const dir = path.join(game.gameDir(app), 'instances', settings.version || cfg.MC_VERSION, 'screenshots');
+  fs.mkdirSync(dir, { recursive: true });
+  return shell.openPath(dir);
+});
+ipcMain.handle('open:logs', () => {
+  const dir = path.join(game.gameDir(app), 'instances', settings.version || cfg.MC_VERSION, 'logs');
+  fs.mkdirSync(dir, { recursive: true });
+  return shell.openPath(dir);
+});
+ipcMain.handle('game:repair', async () => {
+  if (gameProc) throw new Error('Close Minecraft first');
+  const root = game.gameDir(app);
+  for (const d of ['runtime', 'versions', 'libraries']) {
+    await fs.promises.rm(path.join(root, d), { recursive: true, force: true });
+  }
+  logLine('Game files repaired (Java, versions and libraries will be downloaded again)');
+  return true;
+});
+ipcMain.handle('stats:get', () => ({ ...defaults.stats, ...settings.stats }));

@@ -15,12 +15,15 @@ const MODS = [
   { n: 'Fullbright', d: 'See clearly in caves and at night.', c: 'VISUAL', i: '💡' },
   { n: 'Apex Cape', d: 'Wear the Apex Client cape.', c: 'COSMETIC', i: '🧣' },
   { n: 'Discord Rich Presence', d: 'Shows what you play on your Discord profile.', c: 'CLIENT', i: '💬' },
-  { n: 'HUD Editor', d: 'Drag every HUD element where you want it.', c: 'CLIENT', i: '✋' }
+  { n: 'HUD Editor', d: 'Drag every HUD element where you want it.', c: 'CLIENT', i: '✋' },
+  { n: 'Server Quick Join', d: 'Join your favourite servers straight from the launcher.', c: 'CLIENT', i: '🚀' },
+  { n: 'Screenshot Gallery', d: 'All your F2 screenshots in one place.', c: 'CLIENT', i: '🖼️' },
+  { n: 'Sodium', d: 'Big FPS boost on every Fabric version.', c: 'VISUAL', i: '🚀' }
 ];
 
 const NEWS = [
   { tag: 'NEW', t: 'Every version, 1.8 → latest', p: 'Click the version box next to Launch. 1.21.1 has all Apex mods, newer versions get Fabric + Sodium for more FPS.' },
-  { tag: 'TIP', t: 'Press Right Shift', p: 'Open the mod menu in game to toggle mods and drag your HUD anywhere.' },
+  { tag: 'v1.2', t: 'Servers & screenshots', p: 'Join servers in one click, see who is online, and browse your F2 screenshots right here.' },
   { tag: 'DISCORD', t: 'Rich Presence', p: 'Your friends see your server, world and play time right on your Discord profile.' }
 ];
 
@@ -43,6 +46,7 @@ document.querySelectorAll('.nav').forEach(btn => btn.addEventListener('click', (
   document.querySelectorAll('.nav').forEach(b => b.classList.toggle('active', b === btn));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + btn.dataset.page));
   $('crumb').textContent = btn.querySelector('span').textContent;
+  if (btn.dataset.page === 'shots' && typeof loadShots === 'function') loadShots();
 }));
 
 $('btnMin').onclick = () => apex.minimize();
@@ -182,20 +186,23 @@ function setLaunch(main, sub, p = null, cls = '') {
   $('launchFill').style.width = p == null ? '0' : Math.round(p * 100) + '%';
 }
 
-$('btnLaunch').onclick = async () => {
-  if (state !== 'idle') return;
+async function startGame(server) {
+  if (state !== 'idle') return toast('Minecraft is already starting or running.');
   if (!currentAccount) return showLogin();
+  if (server && currentAccount.demo) return toast('Demo accounts can\'t join servers — that needs a Minecraft licence.', true);
+  document.querySelector('[data-page=home]').click();
   state = 'preparing';
-  setLaunch('PREPARING', 'Checking files…', 0, 'busy');
+  setLaunch('PREPARING', server ? `Joining ${server}…` : 'Checking files…', 0, 'busy');
   try {
-    await apex.launch();
+    await apex.launch(server ? { server } : {});
   } catch (e) {
     state = 'idle';
     idleLaunch();
     if (/SIGN_IN/.test(String(e.message || e))) return showLogin();
     toast(String(e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), true);
   }
-};
+}
+$('btnLaunch').onclick = () => startGame();
 
 apex.onProgress(({ text, p }) => {
   if (state === 'running') return;
@@ -208,9 +215,26 @@ apex.onState(s => {
   if (s === 'closed' || s === 'crashed') {
     state = 'idle';
     idleLaunch();
-    if (s === 'crashed') toast('Minecraft closed unexpectedly — check Settings → Game logs.', true);
+    if (s === 'crashed') showCrash();
+    loadStats(); loadShots();
   }
 });
+
+function showCrash() {
+  const tail = logLines.slice(-60).join('\n');
+  let hint = 'Here are the last lines from the game log. Send them to the server owner or developer if you need help.';
+  if (/OutOfMemoryError|Could not reserve enough space/i.test(tail)) hint = 'Minecraft ran out of memory. Go to Settings and give it more RAM (or less, if your PC has under 8 GB).';
+  else if (/jvm\.cfg|Could not find or load main class|Error: could not open/i.test(tail)) hint = 'Java files are damaged. Go to Settings → Repair game files, then launch again.';
+  else if (/Incompatible mod|requires.*fabric|Mod resolution/i.test(tail)) hint = 'A mod does not match this Minecraft version. Pick the APEX version (1.21.1) or remove extra mods.';
+  else if (/GLFW error|OpenGL|pixel format/i.test(tail)) hint = 'Graphics driver problem. Update your graphics driver (NVIDIA / AMD / Intel) and try again.';
+  $('crashHint').textContent = hint;
+  $('crashLog').textContent = tail || 'No log output.';
+  $('crash').classList.add('show');
+  $('crashLog').scrollTop = 1e9;
+}
+$('btnCrashClose').onclick = () => $('crash').classList.remove('show');
+$('btnCrashLogs').onclick = () => apex.openLogs();
+$('btnCrashCopy').onclick = async () => { await navigator.clipboard.writeText($('crashLog').textContent); toast('Log copied'); };
 
 const logLines = [];
 apex.onLog(line => {
@@ -221,6 +245,130 @@ apex.onLog(line => {
 function renderLogs() { const l = $('logs'); l.textContent = logLines.join('\n') || 'No logs yet.'; l.scrollTop = l.scrollHeight; }
 $('btnLogs').onclick = () => { $('logs').classList.toggle('hidden'); renderLogs(); };
 $('btnFolder').onclick = () => apex.openFolder();
+$('btnLogsFolder').onclick = () => apex.openLogs();
+$('btnRepair').onclick = async () => {
+  if (!confirm('Download Java, Minecraft and libraries again? Your worlds, screenshots and settings stay safe.')) return;
+  try { await apex.repair(); toast('Repaired — the next launch downloads fresh game files.'); }
+  catch (e) { toast(String(e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), true); }
+};
+
+// ---------------------------------------------------------------- stats
+function fmtDuration(ms) {
+  const m = Math.floor(ms / 60000);
+  if (m < 60) return m + ' min';
+  const h = Math.floor(m / 60);
+  return h < 100 ? `${h} h ${m % 60} min` : `${h} h`;
+}
+function fmtAgo(t) {
+  if (!t) return 'Never';
+  const d = (Date.now() - t) / 1000;
+  if (d < 60) return 'Just now';
+  if (d < 3600) return Math.floor(d / 60) + ' min ago';
+  if (d < 86400) return Math.floor(d / 3600) + ' h ago';
+  if (d < 86400 * 30) return Math.floor(d / 86400) + ' days ago';
+  return new Date(t).toLocaleDateString();
+}
+async function loadStats() {
+  const st = await apex.stats();
+  $('stTime').textContent = fmtDuration(st.totalMs);
+  $('stLaunches').textContent = st.launches;
+  $('stLast').textContent = fmtAgo(st.lastPlayed);
+  $('stRam').textContent = gb(settings.ramMb);
+}
+
+// ---------------------------------------------------------------- servers
+const statusCache = {};
+const cleanMotd = m => (m && m.clean ? m.clean.join('  ') : '').replace(/\s+/g, ' ').trim();
+
+async function serverStatus(addr, force) {
+  if (!force && statusCache[addr] && Date.now() - statusCache[addr].t < 60000) return statusCache[addr].d;
+  try {
+    const r = await fetch(`https://api.mcsrvstat.us/3/${encodeURIComponent(addr)}`);
+    const d = await r.json();
+    statusCache[addr] = { t: Date.now(), d };
+    return d;
+  } catch (_) { return { online: false }; }
+}
+
+function serverIcon(d) { return d && d.icon ? d.icon : 'assets/emblem.png'; }
+
+async function renderServers(force = false) {
+  const list = settings.servers || [];
+  $('serverList').innerHTML = list.length ? list.map((sv, i) => `
+    <div class="srv" data-i="${i}">
+      <img src="assets/emblem.png" alt="">
+      <div class="info"><b>${esc(sv.name)}</b><span class="addr">${esc(sv.address)}</span>
+        <div class="motd">Checking…</div></div>
+      <div class="players"><b>—</b>players</div>
+      <button class="primary play" data-addr="${esc(sv.address)}">Play</button>
+      <button class="del" title="Remove">✕</button>
+    </div>`).join('') : '<div class="empty">No servers yet — add one above.</div>';
+
+  $('serverList').querySelectorAll('.play').forEach(b => b.onclick = () => startGame(b.dataset.addr));
+  $('serverList').querySelectorAll('.del').forEach(b => b.onclick = async () => {
+    const i = +b.closest('.srv').dataset.i;
+    settings.servers.splice(i, 1);
+    await apex.setSettings({ servers: settings.servers });
+    renderServers(); renderQuick();
+  });
+
+  list.forEach(async (sv, i) => {
+    const d = await serverStatus(sv.address, force);
+    const row = $('serverList').querySelector(`.srv[data-i="${i}"]`);
+    if (!row) return;
+    row.querySelector('img').src = serverIcon(d);
+    row.querySelector('.motd').innerHTML = d.online
+      ? `<span class="dot-on"></span>${esc(cleanMotd(d.motd) || 'Online')}`
+      : '<span class="dot-off"></span>Offline';
+    row.querySelector('.players').innerHTML = d.online
+      ? `<b>${(d.players && d.players.online || 0).toLocaleString()}</b>of ${(d.players && d.players.max || 0).toLocaleString()} · ${esc(d.version || '')}`.slice(0, 120)
+      : '<b>—</b>offline';
+  });
+}
+
+async function renderQuick() {
+  const list = (settings.servers || []).slice(0, 3);
+  $('quick').innerHTML = list.length ? list.map((sv, i) => `
+    <button class="qs" data-addr="${esc(sv.address)}" data-i="${i}">
+      <img src="assets/emblem.png" alt=""><div class="meta"><b>${esc(sv.name)}</b><small>Checking…</small></div>
+      <span class="go">PLAY</span></button>`).join('')
+    : '<div class="empty" style="grid-column:1/-1;padding:18px">Add servers on the Servers page.</div>';
+  $('quick').querySelectorAll('.qs').forEach(b => b.onclick = () => startGame(b.dataset.addr));
+  list.forEach(async (sv, i) => {
+    const d = await serverStatus(sv.address);
+    const el = $('quick').querySelector(`.qs[data-i="${i}"]`);
+    if (!el) return;
+    el.querySelector('img').src = serverIcon(d);
+    el.querySelector('small').innerHTML = d.online
+      ? `<span class="dot-on"></span>${(d.players && d.players.online || 0).toLocaleString()} online`
+      : '<span class="dot-off"></span>Offline';
+  });
+}
+
+$('addServer').onsubmit = async e => {
+  e.preventDefault();
+  const address = $('srvAddr').value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  if (!/^[a-z0-9.\-]+(:\d{1,5})?$/i.test(address)) return toast('That doesn\'t look like a server address.', true);
+  const name = $('srvName').value.trim() || address;
+  settings.servers = [...(settings.servers || []), { name, address }];
+  await apex.setSettings({ servers: settings.servers });
+  $('srvName').value = ''; $('srvAddr').value = '';
+  renderServers(); renderQuick();
+  toast(`Added ${name}`);
+};
+$('btnRefreshServers').onclick = () => renderServers(true);
+
+// ---------------------------------------------------------------- screenshots
+async function loadShots() {
+  const list = await apex.shots();
+  $('shots').innerHTML = list.length ? list.map((sh, i) => `
+    <div class="shot" data-i="${i}"><img loading="lazy" src="${encodeURI(sh.url)}" alt=""><span>${esc(sh.version)} · ${new Date(sh.time).toLocaleString()}</span></div>`).join('')
+    : '<div class="empty" style="grid-column:1/-1">No screenshots yet. Press F2 in game!</div>';
+  $('shots').querySelectorAll('.shot').forEach(el => el.onclick = () => apex.openShot(list[+el.dataset.i].path));
+}
+$('btnShotsFolder').onclick = () => apex.shotsFolder();
+
+document.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => document.querySelector(`[data-page=${b.dataset.goto}]`).click());
 
 // ---------------------------------------------------------------- mods page
 function renderMods(filter = 'ALL') {
@@ -256,6 +404,21 @@ function bindSettings() {
   $('closeOnLaunch').onchange = e => apex.setSettings({ closeOnLaunch: e.target.checked });
   $('discordRpc').checked = settings.discordRpc;
   $('discordRpc').onchange = e => apex.setSettings({ discordRpc: e.target.checked });
+
+  $('fullscreen').checked = !!settings.fullscreen;
+  $('fullscreen').onchange = e => apex.setSettings({ fullscreen: e.target.checked });
+  $('resW').value = settings.width || 1280;
+  $('resH').value = settings.height || 720;
+  const saveRes = () => {
+    const w = Math.min(7680, Math.max(640, +$('resW').value || 1280));
+    const h = Math.min(4320, Math.max(480, +$('resH').value || 720));
+    $('resW').value = w; $('resH').value = h;
+    apex.setSettings({ width: w, height: h });
+  };
+  $('resW').onchange = saveRes; $('resH').onchange = saveRes;
+  $('jvmArgs').value = settings.jvmArgs || '';
+  $('jvmArgs').onchange = e => apex.setSettings({ jvmArgs: e.target.value.trim() });
+  ram.addEventListener('change', () => { settings.ramMb = +ram.value; loadStats(); });
 }
 
 // ---------------------------------------------------------------- start
@@ -268,6 +431,10 @@ function bindSettings() {
   renderMods();
   renderNews();
   bindSettings();
+  loadStats();
+  renderServers();
+  renderQuick();
+  loadShots();
   $('accName').textContent = 'Signing in…';
   setAccount(await apex.getAccount(), true);
 })();

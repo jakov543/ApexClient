@@ -3,6 +3,7 @@ const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
 const { execFile } = require('child_process');
+const crypto = require('crypto');
 const { Readable } = require('stream');
 const { pipeline } = require('stream/promises');
 const AdmZip = require('adm-zip');
@@ -21,17 +22,48 @@ async function getJson(url) {
   return r.json();
 }
 
-async function download(url, dest, onProgress) {
-  const r = await fetch(url, { headers: UA, redirect: 'follow' });
-  if (!r.ok) throw new Error(`Download failed (${r.status}): ${url}`);
-  const total = Number(r.headers.get('content-length')) || 0;
-  let done = 0;
-  await fsp.mkdir(path.dirname(dest), { recursive: true });
-  const tmp = dest + '.part';
-  const body = Readable.fromWeb(r.body);
-  body.on('data', c => { done += c.length; if (total && onProgress) onProgress(done / total); });
-  await pipeline(body, fs.createWriteStream(tmp));
-  await fsp.rename(tmp, dest);
+async function download(url, dest, onProgress, sha256) {
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const tmp = dest + '.part';
+    try {
+      const r = await fetch(url, { headers: UA, redirect: 'follow' });
+      if (!r.ok) throw new Error(`Download failed (${r.status}): ${url}`);
+      const total = Number(r.headers.get('content-length')) || 0;
+      let done = 0;
+      const hash = crypto.createHash('sha256');
+      await fsp.mkdir(path.dirname(dest), { recursive: true });
+      const body = Readable.fromWeb(r.body);
+      body.on('data', c => { done += c.length; hash.update(c); if (total && onProgress) onProgress(done / total); });
+      await pipeline(body, fs.createWriteStream(tmp));
+      if (total && done !== total) throw new Error('Download was cut off');
+      if (sha256 && hash.digest('hex') !== sha256.toLowerCase()) throw new Error('Downloaded file is corrupted');
+      await fsp.rename(tmp, dest);
+      return;
+    } catch (e) {
+      lastErr = e;
+      await fsp.rm(tmp, { force: true }).catch(() => {});
+      if (attempt < 3) await new Promise(r => setTimeout(r, 1500 * attempt));
+    }
+  }
+  throw lastErr;
+}
+
+const run = (file, args, opts = {}) => new Promise((res, rej) =>
+  execFile(file, args, { windowsHide: true, timeout: 120000, ...opts }, (e, out, err) => e ? rej(e) : res(String(out) + String(err))));
+
+/** Unpacks a .zip / .tar.gz. Windows 10/11 ship tar.exe, which is far more reliable than JS unzip. */
+async function extract(archive, dest) {
+  await fsp.mkdir(dest, { recursive: true });
+  if (archive.endsWith('.zip')) {
+    const winTar = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
+    if (process.platform === 'win32' && fs.existsSync(winTar)) {
+      try { await run(winTar, ['-xf', archive, '-C', dest]); return; } catch (_) { /* fall back */ }
+    }
+    new AdmZip(archive).extractAllTo(dest, true);
+  } else {
+    await run('tar', ['-xzf', archive, '-C', dest]);
+  }
 }
 
 function findFile(dir, names) {
@@ -44,32 +76,58 @@ function findFile(dir, names) {
   return null;
 }
 
-// ---------------------------------------------------------------- Java 21 (bundled like Lunar)
+// ---------------------------------------------------------------- Java (bundled like Lunar)
+/** Runs `java -version`; true when this Java really works. */
+async function javaWorks(javaExe) {
+  if (!javaExe || !fs.existsSync(javaExe)) return false;
+  // a half-unpacked Java has bin\javaw.exe but no lib\jvm.cfg (Java 8: lib\amd64\jvm.cfg)
+  const home = path.dirname(path.dirname(javaExe));
+  const cfgOk = ['lib/jvm.cfg', 'lib/amd64/jvm.cfg', 'lib/aarch64/jvm.cfg'].some(f => fs.existsSync(path.join(home, f)));
+  if (!cfgOk) return false;
+  const cli = javaExe.replace(/javaw\.exe$/i, 'java.exe');
+  try { await run(fs.existsSync(cli) ? cli : javaExe, ['-version'], { timeout: 30000 }); return true; }
+  catch (_) { return false; }
+}
+
 async function ensureJava(root, progress, major = 21) {
   const runtime = path.join(root, 'runtime', `java${major}`);
+  const marker = path.join(runtime, '.apex-ok');
   const exe = process.platform === 'win32' ? ['javaw.exe'] : ['java'];
+
   let java = findFile(runtime, exe);
-  if (java) return java;
+  const home = java && path.dirname(path.dirname(java));
+  const cfgOk = home && ['lib/jvm.cfg', 'lib/amd64/jvm.cfg', 'lib/aarch64/jvm.cfg'].some(f => fs.existsSync(path.join(home, f)));
+  if (fs.existsSync(marker) && cfgOk) return java;
+  if (java && await javaWorks(java)) { await fsp.writeFile(marker, 'ok'); return java; }
+
+  // broken or missing → clean reinstall
+  progress(`Repairing Java ${major}`, 0);
+  await fsp.rm(runtime, { recursive: true, force: true });
 
   const os = { win32: 'windows', darwin: 'mac', linux: 'linux' }[process.platform];
   const arch = process.arch === 'arm64' ? 'aarch64' : 'x64';
-  const ext = process.platform === 'win32' ? 'zip' : 'tar.gz';
   // Java 8 has no Apple-silicon build at Adoptium; Rosetta runs the x64 one
   const jarch = (major === 8 && process.platform === 'darwin') ? 'x64' : arch;
-  const url = `https://api.adoptium.net/v3/binary/latest/${major}/ga/${os}/${jarch}/jre/hotspot/normal/eclipse`;
-  const archive = path.join(root, 'runtime', `java${major}.${ext}`);
+  const q = `architecture=${jarch}&heap_size=normal&image_type=jre&jvm_impl=hotspot&os=${os}&vendor=eclipse`;
+  const assets = await getJson(`https://api.adoptium.net/v3/assets/latest/${major}/hotspot?${q}`);
+  if (!assets.length) throw new Error(`No Java ${major} available for this PC`);
+  const pkg = assets[0].binary.package;
+  const ext = pkg.name.endsWith('.zip') ? 'zip' : 'tar.gz';
+  const archive = path.join(root, 'runtime', `java${major}-download.${ext}`);
 
   progress(`Downloading Java ${major}`, 0);
-  await download(url, archive, p => progress(`Downloading Java ${major}`, p));
+  await download(pkg.link, archive, p => progress(`Downloading Java ${major}`, p), pkg.checksum);
   progress(`Installing Java ${major}`, 1);
-  await fsp.mkdir(runtime, { recursive: true });
-  if (ext === 'zip') new AdmZip(archive).extractAllTo(runtime, true);
-  else await new Promise((res, rej) => execFile('tar', ['-xzf', archive, '-C', runtime], e => e ? rej(e) : res()));
+  await extract(archive, runtime);
   await fsp.rm(archive, { force: true });
 
   java = findFile(runtime, exe);
-  if (!java) throw new Error(`Java ${major} install failed`);
-  if (process.platform !== 'win32') await fsp.chmod(java, 0o755);
+  if (java && process.platform !== 'win32') await fsp.chmod(java, 0o755);
+  if (!java || !await javaWorks(java)) {
+    await fsp.rm(runtime, { recursive: true, force: true });
+    throw new Error(`Java ${major} could not be installed. Your antivirus may have blocked it — allow "%APPDATA%\\.apexclient" and try again.`);
+  }
+  await fsp.writeFile(marker, 'ok');
   return java;
 }
 
@@ -227,6 +285,9 @@ async function launch(opts) {
     javaPath,
     version,
     memory: { max: `${opts.ramMb}M`, min: '1024M' },
+    window: opts.window && opts.window.width ? { width: opts.window.width, height: opts.window.height, fullscreen: !!opts.window.fullscreen } : undefined,
+    customArgs: (opts.jvmArgs || '').split(/\s+/).filter(a => /^-[XD]/.test(a)),
+    ...(opts.server ? { quickPlay: { type: 'multiplayer', identifier: opts.server.includes(':') ? opts.server : opts.server + ':25565' } } : {}),
     overrides: { detached: false, maxSockets: 8, gameDirectory: instance }
   });
   if (!proc) throw new Error('Minecraft failed to start (see logs)');

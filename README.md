@@ -24,6 +24,12 @@ Run it (if Windows says *"Windows protected your PC"* → **More info → Run an
   - older versions → vanilla
   - each version has its own saves/mods folder; the right Java (8, 17 or 21) is downloaded automatically
 - Microsoft login (remembered securely), Sign out / switch account, Demo support, browse without signing in
+- **Servers page** — live status (players, MOTD, icon), add/remove servers, one-click **Play** joins directly; Quick join on Home
+- **Screenshots gallery** for all versions
+- **Stats** — play time, launches, last played
+- **Launch options** — fullscreen, window size, Java arguments
+- **Crash helper** — shows the log, explains common causes (memory, Java, mods, graphics driver), copy log
+- **Repair game files** button, self-repairing Java install (checksum-verified)
 - One-click install & launch with progress bar, bundled Java 21
 - Mods / Cosmetics / Settings pages, RAM slider, game logs, news
 - Discord Rich Presence ("In the launcher")
