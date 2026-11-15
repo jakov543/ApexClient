@@ -109,8 +109,14 @@ async function ensureJava(root, progress, major = 21) {
   // Java 8 has no Apple-silicon build at Adoptium; Rosetta runs the x64 one
   const jarch = (major === 8 && process.platform === 'darwin') ? 'x64' : arch;
   const q = `architecture=${jarch}&heap_size=normal&image_type=jre&jvm_impl=hotspot&os=${os}&vendor=eclipse`;
-  const assets = await getJson(`https://api.adoptium.net/v3/assets/latest/${major}/hotspot?${q}`);
-  if (!assets.length) throw new Error(`No Java ${major} available for this PC`);
+  let assets = [];
+  try { assets = await getJson(`https://api.adoptium.net/v3/assets/latest/${major}/hotspot?${q}`); } catch (_) {}
+  if (!assets.length) {
+    // not offered (e.g. a short-lived non-LTS release) → use the next LTS, which runs it fine
+    const next = [17, 21, 25, 29, 33].find(v => v > major);
+    if (next) { await fsp.rm(runtime, { recursive: true, force: true }); return ensureJava(root, progress, next); }
+    throw new Error(`No Java ${major} available for this PC`);
+  }
   const pkg = assets[0].binary.package;
   const ext = pkg.name.endsWith('.zip') ? 'zip' : 'tar.gz';
   const archive = path.join(root, 'runtime', `java${major}-download.${ext}`);
@@ -214,8 +220,9 @@ async function javaMajorFor(mc) {
   const v = m.versions.find(x => x.id === mc);
   if (!v) throw new Error(`Unknown Minecraft version ${mc}`);
   const json = await getJson(v.url);
+  // exactly what this Minecraft version asks for (8, 17, 21, 25, …); 16 → 17 (16 is no longer offered)
   const major = (json.javaVersion && json.javaVersion.majorVersion) || 8;
-  return major >= 21 ? 21 : major >= 17 ? 17 : major >= 16 ? 17 : 8;
+  return major === 16 ? 17 : major;
 }
 
 // ---------------------------------------------------------------- give the in-game mod the Discord id
@@ -274,7 +281,8 @@ async function launch(opts) {
   launcher.on('debug', l => opts.onLog(String(l)));
   launcher.on('data', l => {
     opts.onLog(String(l));
-    if (!started && /Apex Client .* loaded|Setting user|LWJGL/i.test(String(l))) { started = true; opts.onStart(); }
+    // "running" only once the game window is really up (Fabric error screens appear before this)
+    if (!started && /Backend library: LWJGL|LWJGL version|Sound engine started|Created: \d+x\d+x\d+ minecraft:textures|Apex Client .* loaded/i.test(String(l))) { started = true; opts.onStart(); }
   });
   launcher.on('arguments', () => progress('Starting Minecraft', 1));
   launcher.on('close', code => opts.onClose(code));
@@ -291,7 +299,7 @@ async function launch(opts) {
     overrides: { detached: false, maxSockets: 8, gameDirectory: instance }
   });
   if (!proc) throw new Error('Minecraft failed to start (see logs)');
-  setTimeout(() => { if (!started) { started = true; opts.onStart(); } }, 20000);
+  setTimeout(() => { if (!started && proc.exitCode === null) { started = true; opts.onStart(); } }, 120000);
   return proc;
 }
 

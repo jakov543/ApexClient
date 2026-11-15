@@ -223,7 +223,8 @@ apex.onState(s => {
 function showCrash() {
   const tail = logLines.slice(-60).join('\n');
   let hint = 'Here are the last lines from the game log. Send them to the server owner or developer if you need help.';
-  if (/OutOfMemoryError|Could not reserve enough space/i.test(tail)) hint = 'Minecraft ran out of memory. Go to Settings and give it more RAM (or less, if your PC has under 8 GB).';
+  if (/requires version \d+ or later of .*\(java\)|UnsupportedClassVersionError/i.test(tail)) hint = 'This Minecraft version needs a newer Java. The launcher picks the right one automatically now — just press Launch again.';
+  else if (/OutOfMemoryError|Could not reserve enough space/i.test(tail)) hint = 'Minecraft ran out of memory. Go to Settings and give it more RAM (or less, if your PC has under 8 GB).';
   else if (/jvm\.cfg|Could not find or load main class|Error: could not open/i.test(tail)) hint = 'Java files are damaged. Go to Settings → Repair game files, then launch again.';
   else if (/Incompatible mod|requires.*fabric|Mod resolution/i.test(tail)) hint = 'A mod does not match this Minecraft version. Pick the APEX version (1.21.1) or remove extra mods.';
   else if (/GLFW error|OpenGL|pixel format/i.test(tail)) hint = 'Graphics driver problem. Update your graphics driver (NVIDIA / AMD / Intel) and try again.';
