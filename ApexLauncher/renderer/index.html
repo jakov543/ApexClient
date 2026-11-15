@@ -52,13 +52,19 @@
     <!-- HOME -->
     <section class="page active" id="page-home">
       <div class="hero">
+        <div class="hero-stats">
+          <div class="chip"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 10.4V6h-2v7.6l5.2 3.1 1-1.7z"/></svg><span><b id="stTime">0 min</b> played</span></div>
+          <div class="chip"><svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg><span><b id="stLaunches">0</b> launches</span></div>
+          <div class="chip"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 1 3 6.7L4 21v-6h6l-2.3 2.3A7 7 0 1 0 5 12z"/></svg><span>Last <b id="stLast">never</b></span></div>
+          <div class="chip"><svg viewBox="0 0 24 24"><path d="M6 4h12v16H6zM9 7v2h6V7zm0 4v2h6v-2z"/></svg><span><b id="stRam">4 GB</b> RAM</span></div>
+        </div>
         <img class="hero-logo" src="assets/logo.png" alt="Apex Client">
         <p class="tagline">Built for performance. Made for PvP.</p>
 
         <div class="launch-wrap">
           <div class="version-card" id="versionCard" title="Choose Minecraft version">
             <div class="vc-icon"><img src="assets/emblem.png" alt=""></div>
-            <div class="vc-text"><b id="mcVersion">1.21.1</b><small id="mcMode">Apex Client</small></div>
+            <div class="vc-text"><small class="vc-label">VERSION</small><b id="mcVersion">1.21.1</b><small id="mcMode">Apex Client</small></div>
             <svg class="chev" viewBox="0 0 12 12"><path d="M3 7l3-3 3 3"/></svg>
             <div class="ver-menu" id="verMenu">
               <input id="verSearch" placeholder="Search version…" autocomplete="off">
@@ -73,18 +79,16 @@
         </div>
       </div>
 
-      <div class="stats" id="stats">
-        <div class="stat"><small>Play time</small><b id="stTime">0 min</b></div>
-        <div class="stat"><small>Launches</small><b id="stLaunches">0</b></div>
-        <div class="stat"><small>Last played</small><b id="stLast">Never</b></div>
-        <div class="stat"><small>Memory</small><b id="stRam">4 GB</b></div>
+      <div class="home-grid">
+        <div class="panel">
+          <div class="panel-head"><h3>Quick join</h3><button class="link" data-goto="servers">All servers →</button></div>
+          <div class="quick" id="quick"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>What's new</h3><span class="dot"></span></div>
+          <div class="news" id="news"></div>
+        </div>
       </div>
-
-      <div class="news-head"><h3>Quick join</h3><span class="dot"></span><button class="link" data-goto="servers">All servers →</button></div>
-      <div class="quick" id="quick"></div>
-
-      <div class="news-head"><h3>What's new</h3><span class="dot"></span></div>
-      <div class="news" id="news"></div>
     </section>
 
     <!-- SERVERS -->

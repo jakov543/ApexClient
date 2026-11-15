@@ -22,9 +22,10 @@ const MODS = [
 ];
 
 const NEWS = [
-  { tag: 'NEW', t: 'Every version, 1.8 → latest', p: 'Click the version box next to Launch. 1.21.1 has all Apex mods, newer versions get Fabric + Sodium for more FPS.' },
+  { tag: 'v1.3', t: 'New look & Discord status', p: 'Fresh logo, Rich Presence on every version, and Java 25 support for the newest Minecraft.' },
+  { tag: 'NEW', t: 'Every version, 1.8 → latest', p: 'Pick any version next to Launch. 1.21.1 has all Apex mods, other versions get Fabric + Sodium.' },
   { tag: 'v1.2', t: 'Servers & screenshots', p: 'Join servers in one click, see who is online, and browse your F2 screenshots right here.' },
-  { tag: 'DISCORD', t: 'Rich Presence', p: 'Your friends see your server, world and play time right on your Discord profile.' }
+
 ];
 
 const LABELS = { ALL: 'All', HUD: 'HUD', PVP: 'PvP', VISUAL: 'Visual', COSMETIC: 'Cosmetic', CLIENT: 'Client' };
@@ -273,7 +274,7 @@ async function loadStats() {
   const st = await apex.stats();
   $('stTime').textContent = fmtDuration(st.totalMs);
   $('stLaunches').textContent = st.launches;
-  $('stLast').textContent = fmtAgo(st.lastPlayed);
+  $('stLast').textContent = fmtAgo(st.lastPlayed).toLowerCase();
   $('stRam').textContent = gb(settings.ramMb);
 }
 
@@ -328,12 +329,12 @@ async function renderServers(force = false) {
 }
 
 async function renderQuick() {
-  const list = (settings.servers || []).slice(0, 3);
+  const list = (settings.servers || []).slice(0, 6);
   $('quick').innerHTML = list.length ? list.map((sv, i) => `
     <button class="qs" data-addr="${esc(sv.address)}" data-i="${i}">
       <img src="assets/emblem.png" alt=""><div class="meta"><b>${esc(sv.name)}</b><small>Checking…</small></div>
       <span class="go">PLAY</span></button>`).join('')
-    : '<div class="empty" style="grid-column:1/-1;padding:18px">Add servers on the Servers page.</div>';
+    : '<div class="empty" style="padding:18px">Add servers on the Servers page.</div>';
   $('quick').querySelectorAll('.qs').forEach(b => b.onclick = () => startGame(b.dataset.addr));
   list.forEach(async (sv, i) => {
     const d = await serverStatus(sv.address);
@@ -388,7 +389,7 @@ async function renderNews() {
     try { const r = await fetch(info.newsUrl, { cache: 'no-store' }); if (r.ok) news = (await r.json()).slice(0, 3); } catch (_) {}
   }
   $('news').innerHTML = news.map(n => `
-    <div class="news-card"><span class="tag">${esc(n.tag)}</span><b>${esc(n.t)}</b><p>${esc(n.p)}</p></div>`).join('');
+    <div class="news-item"><span class="tag">${esc(n.tag)}</span><div><b>${esc(n.t)}</b><p>${esc(n.p)}</p></div></div>`).join('');
 }
 
 // ---------------------------------------------------------------- settings

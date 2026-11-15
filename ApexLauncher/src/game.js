@@ -6,7 +6,7 @@ const { execFile } = require('child_process');
 const crypto = require('crypto');
 const { Readable } = require('stream');
 const { pipeline } = require('stream/promises');
-const AdmZip = require('adm-zip');
+const extractZip = require('extract-zip');
 const { Client } = require('minecraft-launcher-core');
 const cfg = require('../config');
 
@@ -52,17 +52,18 @@ async function download(url, dest, onProgress, sha256) {
 const run = (file, args, opts = {}) => new Promise((res, rej) =>
   execFile(file, args, { windowsHide: true, timeout: 120000, ...opts }, (e, out, err) => e ? rej(e) : res(String(out) + String(err))));
 
-/** Unpacks a .zip / .tar.gz. Windows 10/11 ship tar.exe, which is far more reliable than JS unzip. */
-async function extract(archive, dest) {
+/** Unpacks a .zip / .tar.gz. Windows 10/11 ship tar.exe (fast, native); extract-zip streams as a fallback. */
+async function extract(archive, dest, log = () => {}) {
   await fsp.mkdir(dest, { recursive: true });
   if (archive.endsWith('.zip')) {
     const winTar = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
     if (process.platform === 'win32' && fs.existsSync(winTar)) {
-      try { await run(winTar, ['-xf', archive, '-C', dest]); return; } catch (_) { /* fall back */ }
+      try { await run(winTar, ['-xf', archive, '-C', dest], { timeout: 15 * 60000 }); return; }
+      catch (e) { log(`tar.exe failed (${e.message}) — using built-in unzip`); await fsp.rm(dest, { recursive: true, force: true }); await fsp.mkdir(dest, { recursive: true }); }
     }
-    new AdmZip(archive).extractAllTo(dest, true);
+    await extractZip(archive, { dir: path.resolve(dest) });   // streaming, no size limits
   } else {
-    await run('tar', ['-xzf', archive, '-C', dest]);
+    await run('tar', ['-xzf', archive, '-C', dest], { timeout: 15 * 60000 });
   }
 }
 
@@ -89,7 +90,7 @@ async function javaWorks(javaExe) {
   catch (_) { return false; }
 }
 
-async function ensureJava(root, progress, major = 21) {
+async function ensureJava(root, progress, major = 21, log = () => {}) {
   const runtime = path.join(root, 'runtime', `java${major}`);
   const marker = path.join(runtime, '.apex-ok');
   const exe = process.platform === 'win32' ? ['javaw.exe'] : ['java'];
@@ -114,7 +115,7 @@ async function ensureJava(root, progress, major = 21) {
   if (!assets.length) {
     // not offered (e.g. a short-lived non-LTS release) → use the next LTS, which runs it fine
     const next = [17, 21, 25, 29, 33].find(v => v > major);
-    if (next) { await fsp.rm(runtime, { recursive: true, force: true }); return ensureJava(root, progress, next); }
+    if (next) { await fsp.rm(runtime, { recursive: true, force: true }); return ensureJava(root, progress, next, log); }
     throw new Error(`No Java ${major} available for this PC`);
   }
   const pkg = assets[0].binary.package;
@@ -124,7 +125,8 @@ async function ensureJava(root, progress, major = 21) {
   progress(`Downloading Java ${major}`, 0);
   await download(pkg.link, archive, p => progress(`Downloading Java ${major}`, p), pkg.checksum);
   progress(`Installing Java ${major}`, 1);
-  await extract(archive, runtime);
+  progress(`Installing Java ${major} (this can take a minute)`, 1);
+  await extract(archive, runtime, log);
   await fsp.rm(archive, { force: true });
 
   java = findFile(runtime, exe);
@@ -237,7 +239,10 @@ async function writeModConfig(instance) {
     text = re.test(text) ? text.replace(re, line) : text + (text.endsWith('\n') || !text ? '' : '\n') + line + '\n';
   };
   if (!/^0+$/.test(cfg.DISCORD_CLIENT_ID)) set('discord.clientId', cfg.DISCORD_CLIENT_ID);
-  set('discord.buttonUrl', cfg.DISCORD_INVITE);
+  set('discord.imageBase', cfg.DISCORD_IMAGES);
+  set('discord.largeImage', cfg.DISCORD_IMAGES + 'logo.png');
+  set('discord.buttonLabel', cfg.DISCORD_INVITE ? 'Join our Discord' : 'Get Apex Client');
+  set('discord.buttonUrl', cfg.DISCORD_INVITE || cfg.DOWNLOAD_URL);
   await fsp.writeFile(file, text);
 }
 
@@ -257,7 +262,7 @@ async function launch(opts) {
   const entry = versions.find(v => v.id === mc);
   if (!entry) throw new Error(`Minecraft ${mc} is not supported`);
 
-  const javaPath = await ensureJava(root, progress, await javaMajorFor(mc));
+  const javaPath = await ensureJava(root, progress, await javaMajorFor(mc), l => opts.onLog('[Launcher] ' + l));
   let version = { number: mc, type: 'release' };
 
   if (entry.mode === 'apex') {

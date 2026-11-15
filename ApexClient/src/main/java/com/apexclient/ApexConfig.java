@@ -13,14 +13,15 @@ import java.util.Properties;
 public final class ApexConfig {
 
     // Put YOUR Discord Application ID here (or in the config file) — see README.
-    public static final String DEFAULT_CLIENT_ID = "000000000000000000";
+    public static final String DEFAULT_CLIENT_ID = "1571423751231373405";
 
     public static String discordClientId = DEFAULT_CLIENT_ID;
+    public static String discordImageBase = "https://raw.githubusercontent.com/jakov543/ApexClient/main/docs/discord/";
     public static boolean discordEnabled = true;
-    public static String discordLargeImage = "logo";
+    public static String discordLargeImage = "https://raw.githubusercontent.com/jakov543/ApexClient/main/docs/discord/logo.png";
     public static boolean showServerAddress = true;
-    public static String buttonLabel = "Join our Discord";
-    public static String buttonUrl = "";
+    public static String buttonLabel = "Get Apex Client";
+    public static String buttonUrl = "https://github.com/jakov543/ApexClient/releases/latest";
     public static boolean customMainMenu = true;
 
     private static Path file() {
@@ -36,7 +37,9 @@ public final class ApexConfig {
         }
         discordClientId = p.getProperty("discord.clientId", discordClientId).trim();
         discordEnabled = bool(p, "discord.enabled", discordEnabled);
+        discordImageBase = p.getProperty("discord.imageBase", discordImageBase).trim();
         discordLargeImage = p.getProperty("discord.largeImage", discordLargeImage).trim();
+        if (discordLargeImage.equals("logo")) discordLargeImage = discordImageBase + "logo.png"; // old configs
         showServerAddress = bool(p, "discord.showServerAddress", showServerAddress);
         buttonLabel = p.getProperty("discord.buttonLabel", buttonLabel);
         buttonUrl = p.getProperty("discord.buttonUrl", buttonUrl).trim();
@@ -48,6 +51,7 @@ public final class ApexConfig {
         Properties p = new Properties();
         p.setProperty("discord.clientId", discordClientId);
         p.setProperty("discord.enabled", String.valueOf(discordEnabled));
+        p.setProperty("discord.imageBase", discordImageBase);
         p.setProperty("discord.largeImage", discordLargeImage);
         p.setProperty("discord.showServerAddress", String.valueOf(showServerAddress));
         p.setProperty("discord.buttonLabel", buttonLabel);

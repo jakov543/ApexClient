@@ -49,14 +49,32 @@ function readToken() {
 }
 
 // ---------------------------------------------------------------- Discord
+const img = f => cfg.DISCORD_IMAGES + f;
+function rpcButtons() {
+  return cfg.DISCORD_INVITE
+    ? [{ label: 'Join our Discord', url: cfg.DISCORD_INVITE }, { label: 'Get Apex Client', url: cfg.DOWNLOAD_URL }]
+    : [{ label: 'Get Apex Client', url: cfg.DOWNLOAD_URL }];
+}
 function launcherPresence() {
   if (!settings.discordRpc) return rpc.clear();
   rpc.setActivity({
     details: 'In the launcher',
     state: `${cfg.NAME} ${cfg.VERSION}`,
     timestamps: { start: launcherStart },
-    assets: { large_image: 'logo', large_text: cfg.NAME },
-    ...(cfg.DISCORD_INVITE ? { buttons: [{ label: 'Join our Discord', url: cfg.DISCORD_INVITE }] } : {})
+    assets: { large_image: img('logo.png'), large_text: `${cfg.NAME} ${cfg.VERSION}` },
+    buttons: rpcButtons()
+  });
+}
+/** While the game runs: versions without the Apex mod get their presence from the launcher. */
+function gamePresence(version, mode, server, demo) {
+  if (!settings.discordRpc) return rpc.clear();
+  const modeText = { fabric: 'Fabric + Sodium', vanilla: 'Vanilla' }[mode] || 'Apex Client';
+  rpc.setActivity({
+    details: server ? `Playing on ${server}` : (demo ? 'Playing the demo' : 'Playing Minecraft'),
+    state: `Minecraft ${version} · ${modeText}`,
+    timestamps: { start: Math.floor(Date.now() / 1000) },
+    assets: { large_image: img('logo.png'), large_text: `${cfg.NAME} ${cfg.VERSION}`, small_image: img(mode === 'vanilla' ? 'vanilla.png' : 'overworld.png'), small_text: modeText },
+    buttons: rpcButtons()
   });
 }
 
@@ -175,7 +193,8 @@ ipcMain.handle('game:launch', async (_e, launchOpts = {}) => {
     ? path.join(process.resourcesPath, 'mods')
     : path.join(__dirname, 'resources', 'mods');
 
-  if (settings.discordRpc) rpc.clear(); // the in-game mod takes over Discord
+  const ver = settings.version || cfg.MC_VERSION;
+  const mode = ver === cfg.MC_VERSION ? 'apex' : (await game.listVersions().then(v => (v.find(x => x.id === ver) || {}).mode).catch(() => 'vanilla')) || 'vanilla';
 
   gameProc = await game.launch({
     app,
@@ -197,6 +216,8 @@ ipcMain.handle('game:launch', async (_e, launchOpts = {}) => {
       settings.stats.lastServer = launchOpts.server || null;
       saveSettings();
       send('game:state', 'running');
+      // Apex (1.21.1) has its own in-game Discord status; other versions get it from the launcher
+      if (mode === 'apex') rpc.clear(); else gamePresence(ver, mode, launchOpts.server, mcAuth && mcAuth.demo);
       if (settings.closeOnLaunch) win.hide();
     },
     onClose: code => {

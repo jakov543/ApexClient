@@ -16,7 +16,7 @@ import net.minecraft.util.Identifier;
 public class ApexMenuScreen extends Screen {
 
     private static final Identifier LOGO = Identifier.of(ApexClient.MOD_ID, "textures/gui/logo.png");
-    private static final int LOGO_TEX_W = 680, LOGO_TEX_H = 256;
+    private static final int LOGO_TEX_W = 720, LOGO_TEX_H = 256;
 
     private long openedAt;
 

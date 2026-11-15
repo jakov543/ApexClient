@@ -85,7 +85,7 @@ public class ModMenuScreen extends Screen {
 
         // header
         RenderSystem.enableBlend();
-        ctx.drawTexture(LOGO, px + 8, py + 6, 0, 0, 64, 24, 64, 24);
+        ctx.drawTexture(LOGO, px + 8, py + 6, 0, 0, 68, 24, 68, 24);
         RenderSystem.disableBlend();
         ctx.drawTextWithShadow(textRenderer, "MODS", px + 78, py + 14, 0xFFFFFFFF);
 

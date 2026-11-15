@@ -61,10 +61,10 @@ The launcher downloads the newest `ApexClient.jar` from the latest release on ev
 For launcher updates, bump `version` in `ApexLauncher/package.json` and players download the new installer.
 
 ## Setup (owner)
-1. **Discord Rich Presence** — create an app at https://discord.com/developers/applications named *Apex Client*,
-   upload `ApexClient/discord-assets/*.png` as Rich Presence art assets (`logo`, `overworld`, `nether`, `end`),
-   and put the **Application ID** in `ApexLauncher/config.js` → `DISCORD_CLIENT_ID`. Optional: `DISCORD_INVITE`.
-2. **Repo name** — if your repo isn't `jakov543/ApexClient`, change `MOD_URL` in `ApexLauncher/config.js`
+1. **Discord Rich Presence** works out of the box (Application ID `1571423751231373405` in `ApexLauncher/config.js`).
+   Images are loaded from `docs/discord/` in this repo, so nothing has to be uploaded to the Discord developer portal.
+   Optional: put your server invite in `DISCORD_INVITE` to add a "Join our Discord" button.
+2. **Repo name** — if your repo isn't `jakov543/ApexClient`, change `MOD_URL`, `DISCORD_IMAGES` and `DOWNLOAD_URL` in `ApexLauncher/config.js`
    and `publish` / `repository` in `ApexLauncher/package.json`.
 3. **News** (optional) — set `NEWS_URL` in `config.js` to a raw `news.json`: `[{"tag":"UPDATE","t":"Title","p":"Text"}]`
 

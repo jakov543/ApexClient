@@ -30,7 +30,7 @@ public class ApexClient implements ClientModInitializer {
 
     public static final String MOD_ID = "apexclient";
     public static final String NAME = "Apex Client";
-    public static final String VERSION = "1.0.0";
+    public static final String VERSION = "1.3.0";
     public static final Logger LOG = LoggerFactory.getLogger(NAME);
 
     public static KeyBinding zoomKey;
@@ -75,7 +75,7 @@ public class ApexClient implements ClientModInitializer {
 
     private static void startDiscord() {
         if (!ApexConfig.discordEnabled) return;
-        if (ApexConfig.discordClientId.isBlank() || ApexConfig.discordClientId.equals(ApexConfig.DEFAULT_CLIENT_ID)) {
+        if (ApexConfig.discordClientId.isBlank() || ApexConfig.discordClientId.matches("0+")) {
             LOG.warn("Discord Rich Presence is off: set discord.clientId in config/apexclient.properties");
             return;
         }
@@ -107,9 +107,10 @@ public class ApexClient implements ClientModInitializer {
                 else state = info.name;
             }
             var dim = mc.world.getRegistryKey();
-            if (dim == World.NETHER) { small = "nether"; smallText = "In the Nether"; }
-            else if (dim == World.END) { small = "end"; smallText = "In the End"; }
-            else { small = "overworld"; smallText = "In the Overworld"; }
+            String base = ApexConfig.discordImageBase;
+            if (dim == World.NETHER) { small = base + "nether.png"; smallText = "In the Nether"; }
+            else if (dim == World.END) { small = base + "end.png"; smallText = "In the End"; }
+            else { small = base + "overworld.png"; smallText = "In the Overworld"; }
         }
         return new RichPresence.Data(details, state, NAME + " " + VERSION + " • MC 1.21.1",
                 small, smallText, ApexConfig.buttonLabel, ApexConfig.buttonUrl);

@@ -1,11 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-<defs>
-<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1a1033"/><stop offset="1" stop-color="#0b0716"/></linearGradient>
-<linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22e3ff"/><stop offset="0.55" stop-color="#7b5cff"/><stop offset="1" stop-color="#d24bff"/></linearGradient>
-</defs>
-<rect x="16" y="16" width="480" height="480" rx="110" fill="url(#bg)"/>
-<rect x="16" y="16" width="480" height="480" rx="110" fill="none" stroke="url(#g)" stroke-width="14"/>
-<path d="M256 92 L408 400 L330 400 L256 246 L182 400 L104 400 Z" fill="url(#g)"/>
-<path d="M256 300 L292 372 L220 372 Z" fill="url(#g)" opacity="0.9"/>
-<path d="M256 92 L292 165 L256 140 L220 165 Z" fill="#ffffff" opacity="0.85"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><defs><linearGradient id="g" gradientUnits="userSpaceOnUse" x1="80" y1="60" x2="440" y2="460"><stop offset="0" stop-color="#2ee6ff"/><stop offset="0.5" stop-color="#7c5cff"/><stop offset="1" stop-color="#ff4fd8"/></linearGradient>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1d1344"/><stop offset="1" stop-color="#0a0618"/></linearGradient>
+<radialGradient id="shine" cx="0.5" cy="0.3" r="0.6"><stop offset="0" stop-color="#7c5cff" stop-opacity="0.35"/><stop offset="1" stop-color="#7c5cff" stop-opacity="0"/></radialGradient>
+</defs><g id="mark">
+  <path d="M256 30 L450 142 L450 370 L256 482 L62 370 L62 142 Z" fill="url(#bg)"/>
+  <path d="M256 30 L450 142 L450 370 L256 482 L62 370 L62 142 Z" fill="url(#shine)"/>
+  <path d="M256 30 L450 142 L450 370 L256 482 L62 370 L62 142 Z" fill="none" stroke="url(#g)" stroke-width="20" stroke-linejoin="round"/>
+  <!-- left blade -->
+  <path d="M248 92 L118 404 L196 404 L256 248 Z" fill="url(#g)"/>
+  <!-- right blade -->
+  <path d="M272 128 L394 404 L316 404 L262 262 Z" fill="url(#g)"/>
+  <!-- lightning crossbar -->
+  <path d="M176 330 L278 300 L262 328 L344 306 L232 362 L248 334 Z" fill="#ffffff"/>
+  <!-- peak spark -->
+  <path d="M248 92 L232 132 L250 122 Z" fill="#ffffff"/>
+</g>
 </svg>
