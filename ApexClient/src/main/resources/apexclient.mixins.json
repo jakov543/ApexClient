@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.apexclient.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "MinecraftClientMixin",
+    "GameRendererMixin",
+    "MouseMixin",
+    "SimpleOptionAccessor",
+    "PlayerCapeMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

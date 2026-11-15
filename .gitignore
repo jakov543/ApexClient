@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.gradle/
+build/
+!ApexLauncher/build/
+run/
+out/
+*.iml
+.idea/
+ApexLauncher/resources/mods/*.jar

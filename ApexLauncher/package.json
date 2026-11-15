@@ -1,0 +1,86 @@
+{
+  "name": "apex-client-launcher",
+  "version": "1.0.0",
+  "description": "Apex Client launcher",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --x64 --publish never"
+  },
+  "author": "Bandera",
+  "license": "MIT",
+  "dependencies": {
+    "adm-zip": "^0.6.1",
+    "minecraft-launcher-core": "^3.18.2",
+    "msmc": "^5.0.5"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^26.18.0",
+    "pe-library": "^1.0.1",
+    "resedit": "^2.0.3"
+  },
+  "productName": "Apex Client",
+  "build": {
+    "appId": "com.apexclient.launcher",
+    "productName": "Apex Client",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "config.js",
+      "src/**",
+      "renderer/**",
+      "build/icon.png"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/mods",
+        "to": "mods",
+        "filter": [
+          "*.jar"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false,
+      "artifactName": "ApexClient-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Apex Client",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "afterPack": "build/afterPack.js",
+    "compression": "normal",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "jakov543",
+        "repo": "ApexClient"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jakov543/ApexClient.git"
+  }
+}

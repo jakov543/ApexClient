@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="256" viewBox="0 0 1024 256">
+<defs>
+<linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22e3ff"/><stop offset="0.55" stop-color="#7b5cff"/><stop offset="1" stop-color="#d24bff"/></linearGradient>
+<linearGradient id="t" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#c9bcff"/></linearGradient>
+</defs>
+<g transform="translate(40,28) scale(0.39)">
+<path d="M256 92 L408 400 L330 400 L256 246 L182 400 L104 400 Z" fill="url(#g)"/>
+<path d="M256 300 L292 372 L220 372 Z" fill="url(#g)"/>
+<path d="M256 92 L292 165 L256 140 L220 165 Z" fill="#ffffff" opacity="0.85"/>
+</g>
+<text x="250" y="150" font-family="Inter Display" font-weight="900" font-size="132" letter-spacing="4" fill="url(#t)">APEX</text>
+<text x="256" y="214" font-family="Inter" font-weight="600" font-size="44" letter-spacing="30" fill="url(#g)">CLIENT</text>
+</svg>

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "apexclient",
+  "version": "${version}",
+  "name": "Apex Client",
+  "description": "Apex Client - custom menu, HUD, zoom and Discord Rich Presence.",
+  "authors": ["Bandera"],
+  "license": "MIT",
+  "icon": "assets/apexclient/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["com.apexclient.ApexClient"]
+  },
+  "mixins": ["apexclient.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
