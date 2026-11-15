@@ -58,7 +58,8 @@ let currentAccount = null;
 
 function readySub() {
   if (!currentAccount) return 'Sign in with Microsoft to play';
-  return currentAccount.demo ? 'Demo mode · buy Minecraft for the full game' : 'Ready to play';
+  if (currentAccount.status === 'needsName') return 'Pick your username to play';
+  return currentAccount.demo ? 'Demo mode · tap your name → Why Demo?' : 'Ready to play';
 }
 function idleLaunch() { setLaunch(currentAccount ? 'LAUNCH GAME' : 'SIGN IN TO PLAY', readySub()); }
 
@@ -69,7 +70,8 @@ function setAccount(acc, firstStart = false) {
   const pill = $('account');
   if (acc) {
     $('accName').innerHTML = esc(acc.name) + (acc.demo ? '<span class="demo-badge">DEMO</span>' : '');
-    $('accSub').textContent = acc.demo ? 'No Minecraft licence' : 'Microsoft account';
+    $('accSub').textContent = { needsName: 'Owns Minecraft · pick a name', bedrockOnly: 'Bedrock only · no Java', none: 'No Java Edition here' }[acc.status] || 'Microsoft account';
+    $('btnWhyDemo').classList.toggle('hidden', !acc.demo);
     $('avatar').src = acc.uuid ? `https://mc-heads.net/avatar/${acc.uuid}/64` : 'assets/emblem.png';
     pill.classList.remove('guest');
     $('login').classList.remove('show');
@@ -83,7 +85,7 @@ function setAccount(acc, firstStart = false) {
     if (!(firstStart && skipped)) showLogin();
   }
   $('setAccName').innerHTML = acc ? esc(acc.name) + (acc.demo ? '<span class="demo-badge">DEMO</span>' : '') : 'Not signed in';
-  $('setAccSub').textContent = acc ? (acc.demo ? 'No Minecraft licence · Demo' : 'Signed in with Microsoft') : 'Sign in to play';
+  $('setAccSub').textContent = acc ? ({ needsName: 'Owns Minecraft — choose a username', bedrockOnly: 'Only Bedrock on this account — Demo', none: 'No Java Edition on this account — Demo' }[acc.status] || 'Signed in with Microsoft') : 'Sign in to play';
   $('setAvatar').src = $('avatar').src;
   $('btnSetAcc').textContent = acc ? 'Sign out' : 'Sign in';
   if (state === 'idle') idleLaunch();
@@ -103,6 +105,58 @@ document.addEventListener('click', () => $('account').classList.remove('open'));
 
 $('btnLogout').onclick = async () => { await apex.logout(); setAccount(null); toast('Signed out'); };
 $('btnSwitch').onclick = async () => { await apex.logout(); setAccount(null); };
+$('btnWhyDemo').onclick = e => { e.stopPropagation(); $('account').classList.remove('open'); currentAccount && currentAccount.status === 'needsName' ? showNameModal() : showDemoModal(); };
+
+// ---------------------------------------------------------------- username / demo help
+let nameTimer = null;
+function showNameModal() {
+  $('nameErr').textContent = ''; $('nameSt').textContent = ''; $('nameSt').className = 'name-st';
+  $('nameModal').classList.add('show');
+  setTimeout(() => $('nameInput').focus(), 50);
+}
+$('nameInput').oninput = () => {
+  const n = $('nameInput').value.trim();
+  clearTimeout(nameTimer);
+  $('nameErr').textContent = '';
+  if (!/^[A-Za-z0-9_]{3,16}$/.test(n)) {
+    $('nameSt').textContent = n ? '3–16: A-Z 0-9 _' : ''; $('nameSt').className = 'name-st bad'; return;
+  }
+  $('nameSt').textContent = 'Checking…'; $('nameSt').className = 'name-st wait';
+  nameTimer = setTimeout(async () => {
+    try {
+      const st = await apex.nameStatus(n);
+      if ($('nameInput').value.trim() !== n) return;
+      const map = { AVAILABLE: ['✓ Available', 'ok'], DUPLICATE: ['✕ Taken', 'bad'], NOT_ALLOWED: ['✕ Not allowed', 'bad'], RATE_LIMITED: ['Slow down…', 'wait'] };
+      const [t, c] = map[st] || ['Can\'t check', 'wait'];
+      $('nameSt').textContent = t; $('nameSt').className = 'name-st ' + c;
+    } catch (_) { $('nameSt').textContent = ''; }
+  }, 500);
+};
+$('nameInput').onkeydown = e => { if (e.key === 'Enter') $('btnNameCreate').click(); };
+$('btnNameLater').onclick = () => $('nameModal').classList.remove('show');
+$('btnNameCreate').onclick = async () => {
+  const b = $('btnNameCreate'); b.disabled = true; $('nameErr').textContent = '';
+  try {
+    const acc = await apex.createProfile($('nameInput').value.trim());
+    setAccount(acc);
+    $('nameModal').classList.remove('show');
+    toast(`Welcome, ${acc.name}! You now have the full game.`);
+  } catch (e) {
+    $('nameErr').textContent = String(e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+  } finally { b.disabled = false; }
+};
+
+function showDemoModal() {
+  const a = currentAccount || {};
+  $('demoTitle').textContent = a.status === 'bedrockOnly' ? 'This account only has Minecraft Bedrock' : 'No Minecraft: Java Edition on this account';
+  $('demoText').textContent = a.status === 'bedrockOnly'
+    ? 'Bedrock Edition (Windows / console / phone) is a different game. The launcher needs Java Edition. "Minecraft: Java & Bedrock Edition for PC" includes both.'
+    : 'Microsoft says this account does not own Minecraft: Java Edition, so the launcher started the free Demo. The most common reasons:';
+  $('demoOwns').textContent = a.entitlements && a.entitlements.length ? 'Account owns: ' + a.entitlements.join(', ') : 'Account owns: nothing from Minecraft';
+  $('demoModal').classList.add('show');
+}
+$('btnDemoOk').onclick = () => $('demoModal').classList.remove('show');
+$('btnDemoSwitch').onclick = async () => { $('demoModal').classList.remove('show'); await apex.logout(); setAccount(null); showLogin(); };
 
 // ---------------------------------------------------------------- version picker
 const MODE = {
@@ -170,9 +224,9 @@ $('btnLogin').onclick = async () => {
     const acc = await apex.login();
     try { localStorage.removeItem('skipLogin'); } catch (_) {}
     setAccount(acc);
-    toast(acc.demo
-      ? 'Signed in. No Minecraft Java profile on this account, so you get the free Demo. (Game Pass? Open the official launcher once to pick a name.)'
-      : 'Signed in — have fun!');
+    if (acc.status === 'needsName') showNameModal();
+    else if (acc.demo) showDemoModal();
+    else toast(`Signed in as ${acc.name} — have fun!`);
   } catch (e) {
     const msg = String(e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
     $('loginErr').textContent = /cancel|closed by user/i.test(msg) ? 'Sign in cancelled.' : msg;
@@ -200,6 +254,7 @@ async function startGame(server) {
     state = 'idle';
     idleLaunch();
     if (/SIGN_IN/.test(String(e.message || e))) return showLogin();
+    if (/NEEDS_NAME/.test(String(e.message || e))) return showNameModal();
     toast(String(e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), true);
   }
 }
@@ -438,5 +493,8 @@ function bindSettings() {
   renderQuick();
   loadShots();
   $('accName').textContent = 'Signing in…';
-  setAccount(await apex.getAccount(), true);
+  const acc0 = await apex.getAccount();
+  setAccount(acc0, true);
+  if (acc0 && acc0.status === 'needsName') showNameModal();
+  else if (acc0 && acc0.demo) showDemoModal();
 })();

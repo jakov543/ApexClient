@@ -6,7 +6,7 @@ const { Auth } = require('msmc');
 const cfg = require('./config');
 const game = require('./src/game');
 const DiscordRPC = require('./src/discord');
-const { minecraftLogin, niceError, isValid, toMclc } = require('./src/mcauth');
+const { minecraftLogin, createProfile, nameStatus, niceError, isValid, toMclc } = require('./src/mcauth');
 
 let win;
 let account = null;        // { name, uuid }
@@ -126,7 +126,13 @@ ipcMain.handle('settings:set', (_e, patch) => {
 });
 
 function toAccount(mc) {
-  return { name: mc.demo ? 'Demo player' : mc.name, uuid: mc.demo ? null : mc.id, demo: mc.demo };
+  return {
+    name: mc.demo ? (mc.status === 'needsName' ? 'Choose a name' : 'Demo player') : mc.name,
+    uuid: mc.demo ? null : mc.id,
+    demo: mc.demo,
+    status: mc.status || (mc.demo ? 'none' : 'ok'),
+    entitlements: mc.entitlements || []
+  };
 }
 
 // launcher log file (userData/launcher.log) so sign-in problems can be checked later
@@ -165,13 +171,28 @@ ipcMain.handle('account:login', async () => {
     storeToken(xbox.save());
     mcAuth = await minecraftLogin(xbox);  // no Minecraft on the account → official Demo
     account = toAccount(mcAuth);
-    logLine(`Signed in as ${account.name}${account.demo ? ' (demo)' : ''}`);
+    logLine(`Signed in as ${account.name} — status ${account.status}${account.entitlements.length ? ' — owns: ' + account.entitlements.join(', ') : ''}`);
     return account;
   } catch (e) {
     const err = niceError(e);
     logLine('Sign-in failed: ' + err.message);
     throw err;
   }
+});
+
+ipcMain.handle('account:nameStatus', async (_e, name) => {
+  if (!mcAuth) throw new Error('SIGN_IN');
+  return nameStatus(mcAuth, String(name || '').trim());
+});
+ipcMain.handle('account:createProfile', async (_e, name) => {
+  if (!mcAuth) throw new Error('SIGN_IN');
+  if (!isValid(mcAuth)) { const t = readToken(); if (!t) throw new Error('SIGN_IN'); mcAuth = await signInWithToken(t); }
+  try {
+    await createProfile(mcAuth, String(name || '').trim());
+    account = toAccount(mcAuth);
+    logLine(`Created Java username ${account.name}`);
+    return account;
+  } catch (e) { const err = niceError(e); logLine('Create username failed: ' + err.message); throw err; }
 });
 
 ipcMain.handle('account:logout', () => {
@@ -182,6 +203,7 @@ ipcMain.handle('account:logout', () => {
 ipcMain.handle('game:launch', async (_e, launchOpts = {}) => {
   if (gameProc) throw new Error('Game is already running');
   if (!mcAuth) throw new Error('SIGN_IN');
+  if (mcAuth.status === 'needsName') throw new Error('NEEDS_NAME');
   // refresh the Minecraft token if it expired while the launcher was open
   if (!isValid(mcAuth)) {
     const token = readToken();

@@ -45,7 +45,7 @@
         <img id="avatar" src="assets/emblem.png" alt="">
         <div class="acc-text"><span id="accName">Not signed in</span><small id="accSub">Microsoft account</small></div>
         <svg class="chev" viewBox="0 0 12 12"><path d="M3 5l3 3 3-3"/></svg>
-        <div class="acc-menu" id="accMenu"><button id="btnSwitch">Switch account</button><button id="btnLogout">Sign out</button></div>
+        <div class="acc-menu" id="accMenu"><button id="btnWhyDemo" class="hidden">Why Demo?</button><button id="btnSwitch">Switch account</button><button id="btnLogout">Sign out</button></div>
       </div>
     </div>
 
@@ -215,6 +215,41 @@
     <div class="login-err" id="loginErr"></div>
     <button class="skip" id="btnSkip">Continue without signing in</button>
     <p class="login-note">No Minecraft yet? Sign in anyway to play the free Demo.</p>
+  </div>
+</div>
+
+<div class="modal" id="nameModal">
+  <div class="modal-card ok">
+    <div class="modal-ic good">✓</div>
+    <h2>You own Minecraft! Pick your username</h2>
+    <p>This account has Minecraft: Java Edition but no username yet. Choose one to get the full game — this is the same as doing it in the official launcher, and you can change it later on minecraft.net.</p>
+    <div class="name-row">
+      <input id="nameInput" maxlength="16" placeholder="3–16 letters, numbers or _" spellcheck="false" autocomplete="off">
+      <span class="name-st" id="nameSt"></span>
+    </div>
+    <div class="login-err" id="nameErr"></div>
+    <div class="modal-btns">
+      <button class="ghost" id="btnNameLater">Later (play Demo)</button>
+      <button class="primary" id="btnNameCreate">Create username</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="demoModal">
+  <div class="modal-card info">
+    <div class="modal-ic warn">?</div>
+    <h2 id="demoTitle">No Minecraft: Java Edition on this account</h2>
+    <p id="demoText"></p>
+    <ul class="demo-list">
+      <li><b>Different account?</b> You may have signed in with another Microsoft account than the one that bought Minecraft. Use <b>Switch account</b> and pick the right one.</li>
+      <li><b>Game Pass?</b> Make sure your PC Game Pass / Ultimate subscription is active on this account.</li>
+      <li><b>Bought it recently?</b> Open the official Minecraft Launcher once, then sign in here again.</li>
+    </ul>
+    <p class="owns" id="demoOwns"></p>
+    <div class="modal-btns">
+      <button class="ghost" id="btnDemoOk">Play Demo</button>
+      <button class="primary" id="btnDemoSwitch">Switch account</button>
+    </div>
   </div>
 </div>
 

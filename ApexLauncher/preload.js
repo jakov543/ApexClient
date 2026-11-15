@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('apex', {
   getAccount: () => ipcRenderer.invoke('account:get'),
   login: () => ipcRenderer.invoke('account:login'),
   logout: () => ipcRenderer.invoke('account:logout'),
+  nameStatus: n => ipcRenderer.invoke('account:nameStatus', n),
+  createProfile: n => ipcRenderer.invoke('account:createProfile', n),
   launch: (o) => ipcRenderer.invoke('game:launch', o || {}),
   shots: () => ipcRenderer.invoke('shots:list'),
   openShot: p => ipcRenderer.invoke('shots:open', p),

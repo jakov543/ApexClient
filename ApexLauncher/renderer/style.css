@@ -350,3 +350,18 @@ input[type=number]::-webkit-inner-spin-button { opacity: .4; }
 .hero { flex-basis: clamp(292px, calc((100vh - 150px) * 0.5), 470px); }
 .panel .news::-webkit-scrollbar, .panel .quick::-webkit-scrollbar { width: 4px; }
 .panel .news::-webkit-scrollbar-thumb, .panel .quick::-webkit-scrollbar-thumb { background: #2c2250; border-radius: 4px; }
+
+/* username + demo modals */
+.modal-card.ok { border-color: rgba(31,216,138,.35); }
+.modal-card.info { border-color: rgba(255,185,0,.3); }
+.modal-ic.good { background: rgba(31,216,138,.16); color: #4ff0a8; }
+.modal-ic.warn { background: rgba(255,185,0,.16); color: #ffcf5c; }
+.name-row { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.name-row input { flex: 1; padding: 12px 14px; border-radius: 10px; border: 1px solid #2f2650; background: #0f0a20; color: var(--text); font: inherit; font-size: 16px; font-weight: 700; outline: none; }
+.name-row input:focus { border-color: var(--violet); }
+.name-st { min-width: 120px; font-size: 13px; font-weight: 700; }
+.name-st.ok { color: #4ff0a8; } .name-st.bad { color: #ff7b88; } .name-st.wait { color: var(--muted); }
+.demo-list { margin: 4px 0 6px 18px; color: #cfc8ea; font-size: 13px; line-height: 1.55; }
+.demo-list li { margin-bottom: 6px; }
+.owns { font-size: 11.5px !important; opacity: .7; font-family: Consolas, monospace; }
+#btnWhyDemo:hover { background: rgba(255,185,0,.15) !important; color: #ffcf5c !important; }

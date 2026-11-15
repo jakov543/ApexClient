@@ -29,7 +29,7 @@ call gradlew.bat build --no-daemon
 if errorlevel 1 ( popd & echo. & echo [X] MOD BUILD FAILED - copy the error above and send it. & pause & exit /b 1 )
 popd
 if not exist "ApexLauncher\resources\mods" mkdir "ApexLauncher\resources\mods"
-copy /Y "ApexClient\build\libs\ApexClient-1.0.0.jar" "ApexLauncher\resources\mods\ApexClient.jar" >nul
+copy /Y "ApexClient\build\libs\ApexClient-1.3.0.jar" "ApexLauncher\resources\mods\ApexClient.jar" >nul
 
 echo.
 echo [2/3] Installing launcher packages...
