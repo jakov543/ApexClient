@@ -19,7 +19,7 @@ const MODS = [
 ];
 
 const NEWS = [
-  { tag: 'WELCOME', t: 'Apex Client is here', p: 'A fast, clean PvP client for Minecraft 1.21.1 with all your favourite mods built in.' },
+  { tag: 'NEW', t: 'Every version, 1.8 → latest', p: 'Click the version box next to Launch. 1.21.1 has all Apex mods, newer versions get Fabric + Sodium for more FPS.' },
   { tag: 'TIP', t: 'Press Right Shift', p: 'Open the mod menu in game to toggle mods and drag your HUD anywhere.' },
   { tag: 'DISCORD', t: 'Rich Presence', p: 'Your friends see your server, world and play time right on your Discord profile.' }
 ];
@@ -77,8 +77,17 @@ function setAccount(acc, firstStart = false) {
     try { skipped = localStorage.getItem('skipLogin') === '1'; } catch (_) {}
     if (!(firstStart && skipped)) showLogin();
   }
+  $('setAccName').innerHTML = acc ? esc(acc.name) + (acc.demo ? '<span class="demo-badge">DEMO</span>' : '') : 'Not signed in';
+  $('setAccSub').textContent = acc ? (acc.demo ? 'No Minecraft licence · Demo' : 'Signed in with Microsoft') : 'Sign in to play';
+  $('setAvatar').src = $('avatar').src;
+  $('btnSetAcc').textContent = acc ? 'Sign out' : 'Sign in';
   if (state === 'idle') idleLaunch();
 }
+
+$('btnSetAcc').onclick = async () => {
+  if (currentAccount) { await apex.logout(); setAccount(null); toast('Signed out'); }
+  else showLogin();
+};
 
 $('account').onclick = e => {
   e.stopPropagation();
@@ -87,7 +96,62 @@ $('account').onclick = e => {
 };
 document.addEventListener('click', () => $('account').classList.remove('open'));
 
-$('btnLogout').onclick = async () => { await apex.logout(); setAccount(null); };
+$('btnLogout').onclick = async () => { await apex.logout(); setAccount(null); toast('Signed out'); };
+$('btnSwitch').onclick = async () => { await apex.logout(); setAccount(null); };
+
+// ---------------------------------------------------------------- version picker
+const MODE = {
+  apex: { tag: 'APEX', cls: 'tag-apex', text: 'Apex Client · all mods' },
+  fabric: { tag: 'FPS BOOST', cls: 'tag-fabric', text: 'Fabric + Sodium' },
+  vanilla: { tag: 'VANILLA', cls: 'tag-vanilla', text: 'Vanilla' }
+};
+let versions = [];
+
+function showVersion(id) {
+  const v = versions.find(x => x.id === id) || { id, mode: id === info.mc ? 'apex' : 'vanilla' };
+  $('mcVersion').textContent = v.id;
+  $('mcMode').textContent = MODE[v.mode].text;
+}
+
+function renderVersions() {
+  const q = $('verSearch').value.trim();
+  const list = versions.filter(v => !q || v.id.includes(q));
+  $('verList').innerHTML = list.length ? list.map(v => `
+    <button class="ver-item ${v.id === settings.version ? 'sel' : ''}" data-v="${esc(v.id)}">
+      <span>${esc(v.id)}</span><span class="ver-tag ${MODE[v.mode].cls}">${MODE[v.mode].tag}</span></button>`).join('')
+    : '<div class="ver-empty">No version found</div>';
+  $('verList').querySelectorAll('.ver-item').forEach(b => b.onclick = async e => {
+    e.stopPropagation();
+    settings.version = b.dataset.v;
+    await apex.setSettings({ version: settings.version });
+    showVersion(settings.version);
+    $('versionCard').classList.remove('open');
+  });
+}
+
+async function loadVersions() {
+  try {
+    versions = await apex.versions();
+    // Apex version first
+    versions.sort((a, b) => (b.mode === 'apex') - (a.mode === 'apex'));
+  } catch (_) {
+    versions = [{ id: info.mc, mode: 'apex' }];
+    $('verList').innerHTML = '<div class="ver-empty">Offline — only the Apex version is listed</div>';
+  }
+  showVersion(settings.version);
+  renderVersions();
+}
+
+$('versionCard').onclick = e => {
+  if (e.target.closest('.ver-menu')) return;
+  e.stopPropagation();
+  if (state !== 'idle') return;
+  $('versionCard').classList.toggle('open');
+  if ($('versionCard').classList.contains('open')) { $('verSearch').value = ''; renderVersions(); $('verSearch').focus(); }
+};
+$('verSearch').oninput = renderVersions;
+$('verMenu').onclick = e => e.stopPropagation();
+document.addEventListener('click', () => $('versionCard').classList.remove('open'));
 
 $('btnSkip').onclick = () => {
   try { localStorage.setItem('skipLogin', '1'); } catch (_) {}
@@ -196,8 +260,9 @@ function bindSettings() {
 (async () => {
   info = await apex.info();
   settings = await apex.getSettings();
-  $('mcVersion').textContent = info.mc;
-  $('appVersion').textContent = 'v' + info.version;
+  settings.version = settings.version || info.mc;
+  showVersion(settings.version);
+  loadVersions();
   renderMods();
   renderNews();
   bindSettings();

@@ -41,7 +41,7 @@
         <img id="avatar" src="assets/emblem.png" alt="">
         <div class="acc-text"><span id="accName">Not signed in</span><small id="accSub">Microsoft account</small></div>
         <svg class="chev" viewBox="0 0 12 12"><path d="M3 5l3 3 3-3"/></svg>
-        <div class="acc-menu" id="accMenu"><button id="btnLogout">Sign out</button></div>
+        <div class="acc-menu" id="accMenu"><button id="btnSwitch">Switch account</button><button id="btnLogout">Sign out</button></div>
       </div>
     </div>
 
@@ -52,9 +52,14 @@
         <p class="tagline">Built for performance. Made for PvP.</p>
 
         <div class="launch-wrap">
-          <div class="version-card">
+          <div class="version-card" id="versionCard" title="Choose Minecraft version">
             <div class="vc-icon"><img src="assets/emblem.png" alt=""></div>
-            <div><b id="mcVersion">1.21.1</b><small>Fabric · Apex Client <span id="appVersion"></span></small></div>
+            <div class="vc-text"><b id="mcVersion">1.21.1</b><small id="mcMode">Apex Client</small></div>
+            <svg class="chev" viewBox="0 0 12 12"><path d="M3 7l3-3 3 3"/></svg>
+            <div class="ver-menu" id="verMenu">
+              <input id="verSearch" placeholder="Search version…" autocomplete="off">
+              <div class="ver-list" id="verList"><div class="ver-empty">Loading versions…</div></div>
+            </div>
           </div>
           <button class="launch" id="btnLaunch">
             <div class="fill" id="launchFill"></div>
@@ -98,6 +103,12 @@
     <section class="page" id="page-settings">
       <div class="page-head"><h2>Settings</h2><p>Launcher and game options.</p></div>
       <div class="settings">
+        <div class="set-card">
+          <div class="set-row">
+            <div class="acc-row"><img id="setAvatar" src="assets/emblem.png" alt=""><div><b id="setAccName">Not signed in</b><small id="setAccSub">Microsoft account</small></div></div>
+            <button class="ghost" id="btnSetAcc">Sign in</button>
+          </div>
+        </div>
         <div class="set-card">
           <div class="set-row">
             <div><b>Allocated memory</b><small>RAM given to Minecraft. 4 GB is plenty for most players.</small></div>

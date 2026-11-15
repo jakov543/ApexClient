@@ -17,7 +17,7 @@ const launcherStart = Math.floor(Date.now() / 1000);
 
 // ---------------------------------------------------------------- settings
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
-const defaults = { ramMb: Math.max(2048, Math.floor(Math.min(4096, os.totalmem() / 1048576 / 2) / 256) * 256), closeOnLaunch: false, discordRpc: true, token: null };
+const defaults = { ramMb: Math.max(2048, Math.floor(Math.min(4096, os.totalmem() / 1048576 / 2) / 256) * 256), closeOnLaunch: false, discordRpc: true, version: cfg.MC_VERSION, token: null };
 let settings = { ...defaults };
 
 function loadSettings() {
@@ -102,6 +102,8 @@ function toAccount(mc) {
   return { name: demo ? 'Demo player' : mc.profile.name, uuid: demo ? null : mc.profile.id, demo };
 }
 
+ipcMain.handle('versions:list', async () => game.listVersions());
+
 ipcMain.handle('account:get', async () => {
   if (account) return account;
   const token = readToken();
@@ -145,6 +147,7 @@ ipcMain.handle('game:launch', async () => {
   gameProc = await game.launch({
     app,
     auth: mcAuth.mclc(),
+    version: settings.version || cfg.MC_VERSION,
     ramMb: settings.ramMb,
     bundledModsDir,
     onProgress: (text, p) => send('game:progress', { text, p }),

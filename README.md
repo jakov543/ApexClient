@@ -1,7 +1,7 @@
 <p align="center"><img src="docs/logo.png" alt="Apex Client" width="560"></p>
 
 <p align="center">
-  <b>A fast, clean Lunar-style client for Minecraft Java 1.21.1</b><br>
+  <b>A fast, clean Lunar-style client for Minecraft Java — every version from 1.8 to the latest</b><br>
   Own launcher · built-in PvP mods · draggable HUD · Discord Rich Presence · Windows 10 &amp; 11
 </p>
 
@@ -18,7 +18,12 @@ Run it (if Windows says *"Windows protected your PC"* → **More info → Run an
 ## Features
 
 **Launcher**
-- Microsoft login (remembered securely), Demo support, browse without signing in
+- **Every Minecraft release from 1.8 to the newest** — pick it in the version box
+  - **1.21.1** → full Apex Client (all mods below)
+  - versions Fabric supports → Fabric + Fabric API + **Sodium** (FPS boost)
+  - older versions → vanilla
+  - each version has its own saves/mods folder; the right Java (8, 17 or 21) is downloaded automatically
+- Microsoft login (remembered securely), Sign out / switch account, Demo support, browse without signing in
 - One-click install & launch with progress bar, bundled Java 21
 - Mods / Cosmetics / Settings pages, RAM slider, game logs, news
 - Discord Rich Presence ("In the launcher")

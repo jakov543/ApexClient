@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('apex', {
   login: () => ipcRenderer.invoke('account:login'),
   logout: () => ipcRenderer.invoke('account:logout'),
   launch: () => ipcRenderer.invoke('game:launch'),
+  versions: () => ipcRenderer.invoke('versions:list'),
   openFolder: () => ipcRenderer.invoke('open:folder'),
   openUrl: u => ipcRenderer.invoke('open:url', u),
   onProgress: cb => ipcRenderer.on('game:progress', (_e, d) => cb(d)),
