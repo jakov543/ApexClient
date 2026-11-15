@@ -1,11 +1,12 @@
 {
   "name": "apex-client-launcher",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "Apex Client launcher",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win nsis --x64 --publish never"
+    "dist": "electron-builder --win nsis --x64 --publish never",
+    "test": "node --test"
   },
   "author": "Bandera",
   "license": "MIT",

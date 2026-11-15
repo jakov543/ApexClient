@@ -22,6 +22,7 @@ const MODS = [
 ];
 
 const NEWS = [
+  { tag: 'v1.6', t: 'Mods, resource packs & shaders', p: 'Search Modrinth and install with one click on the Mods page. Shaders set up Iris + Sodium for you.' },
   { tag: 'FREE', t: 'Luanti — free for everyone', p: 'No Minecraft? Switch to Luanti on Home and play Mineclonia or VoxeLibre for free, no account needed.' },
   { tag: 'v1.4', t: 'New in-game menus', p: 'Brand-new main menu and Right Shift mod menu with profiles, search, and OPTIONS for every mod (1.21.1).' },
   { tag: 'v1.3', t: 'New look & Discord status', p: 'Fresh logo, Rich Presence on every version, and Java 25 support for the newest Minecraft.' },
@@ -49,6 +50,7 @@ document.querySelectorAll('.nav').forEach(btn => btn.addEventListener('click', (
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + btn.dataset.page));
   $('crumb').textContent = btn.querySelector('span').textContent;
   if (btn.dataset.page === 'shots' && typeof loadShots === 'function') loadShots();
+  if (btn.dataset.page === 'mods' && typeof openLibrary === 'function') openLibrary();
 }));
 
 $('btnMin').onclick = () => apex.minimize();
@@ -517,6 +519,122 @@ function renderMods(filter = 'ALL') {
   $('modGrid').innerHTML = MODS.filter(m => filter === 'ALL' || m.c === filter).map(m => `
     <div class="mod"><div class="ic">${m.i}</div>
       <div><b>${esc(m.n)}</b><p>${esc(m.d)}</p><div class="cat">${m.c}</div></div></div>`).join('');
+}
+
+// ---------------------------------------------------------------- mods & packs (Modrinth)
+const LIB_LABEL = { mod: 'mods', resourcepack: 'resource packs', shader: 'shaders' };
+let libTab = 'mod', libOffset = 0, libTotal = 0, libHits = [], libBusy = false, libCtx = { mc: '', mode: 'apex' };
+let installedIds = new Set(), searchTimer = null, libSeq = 0;
+const fmtNum = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'K' : String(n);
+const errText = e => String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+
+async function refreshInstalled() {
+  const list = await apex.contentInstalled().catch(() => []);
+  installedIds = new Set(list.filter(x => x.id).map(x => x.id));
+  $('instCount').textContent = list.filter(x => !x.builtin).length;
+  return list;
+}
+
+async function openLibrary() {
+  libCtx = await apex.contentContext();
+  const modeText = { apex: 'Apex Client (Fabric)', fabric: 'Fabric', vanilla: 'Vanilla' }[libCtx.mode] || libCtx.mode;
+  $('ctxLine').textContent = `Installs into Minecraft ${libCtx.mc} · ${modeText}. Change the version on Home.`;
+  await refreshInstalled();
+  showLibTab(libTab);
+}
+
+function showLibTab(t) {
+  libTab = t;
+  $('libTabs').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.t === t));
+  const browse = ['mod', 'resourcepack', 'shader'].includes(t);
+  $('libSearch').classList.toggle('hidden', !browse);
+  $('libGrid').classList.toggle('hidden', t === 'apex');
+  $('modFilters').classList.toggle('hidden', t !== 'apex');
+  $('modGrid').classList.toggle('hidden', t !== 'apex');
+  $('libMoreWrap').classList.add('hidden');
+  const needsFabric = t === 'mod' || t === 'shader';
+  if (browse && needsFabric && libCtx.mode === 'vanilla') {
+    $('libNotice').textContent = `Minecraft ${libCtx.mc} runs without Fabric, so ${LIB_LABEL[t]} can't be added. On Home, pick a version tagged APEX or FPS BOOST. Resource packs work on every version.`;
+    $('libNotice').classList.remove('hidden');
+  } else if (t === 'shader') {
+    $('libNotice').textContent = 'Shaders need Iris + Sodium — they are installed automatically with your first shader.';
+    $('libNotice').classList.remove('hidden');
+  } else $('libNotice').classList.add('hidden');
+  $('libQuery').placeholder = browse ? `Search ${LIB_LABEL[t]} on Modrinth…` : '';
+  if (browse) loadLibrary(true);
+  else if (t === 'installed') renderInstalled();
+  else renderMods();
+}
+$('libTabs').querySelectorAll('button').forEach(b => b.onclick = () => showLibTab(b.dataset.t));
+$('libQuery').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => loadLibrary(true), 400); };
+$('libSort').onchange = () => loadLibrary(true);
+$('libMore').onclick = () => loadLibrary(false);
+$('btnModsFolder').onclick = () => apex.openInstance({ mod: 'mods', resourcepack: 'resourcepacks', shader: 'shaderpacks' }[libTab] || '');
+
+async function loadLibrary(reset) {
+  const seq = ++libSeq;
+  if (reset) { libOffset = 0; libHits = []; $('libGrid').innerHTML = Array(6).fill('<div class="skeleton"></div>').join(''); }
+  try {
+    const r = await apex.contentSearch({ type: libTab, query: $('libQuery').value.trim(), sort: $('libSort').value, offset: libOffset });
+    if (seq !== libSeq) return; // a newer search started
+    libTotal = r.total; libHits = libHits.concat(r.hits); libOffset = libHits.length;
+    renderLibrary();
+  } catch (e) {
+    if (seq !== libSeq) return;
+    $('libGrid').innerHTML = `<div class="empty" style="grid-column:1/-1">Could not reach Modrinth: ${esc(errText(e))}</div>`;
+  }
+}
+
+function renderLibrary() {
+  const blocked = (libTab === 'mod' || libTab === 'shader') && libCtx.mode === 'vanilla';
+  $('libGrid').innerHTML = libHits.length ? libHits.map((h, i) => `
+    <div class="lib-card">
+      <div class="ic" style="background-image:url('${esc(h.icon || 'assets/emblem.png')}')"></div>
+      <div class="body">
+        <b title="${esc(h.title)}">${esc(h.title)}</b>
+        <span class="by">by ${esc(h.author)}</span>
+        <p>${esc(h.description)}</p>
+        <div class="row"><span class="dl">⬇ ${fmtNum(h.downloads)} downloads</span>
+          ${installedIds.has(h.id) ? '<span class="btn-installed">✓ Installed</span>'
+            : `<button class="btn-install" data-i="${i}" ${blocked || libBusy ? 'disabled' : ''}>Install</button>`}</div>
+      </div>
+    </div>`).join('') : `<div class="empty" style="grid-column:1/-1">No ${LIB_LABEL[libTab]} found for Minecraft ${esc(libCtx.mc)}.</div>`;
+  $('libGrid').querySelectorAll('.btn-install').forEach(b => b.onclick = () => installItem(libHits[+b.dataset.i]));
+  $('libMoreWrap').classList.toggle('hidden', libHits.length >= libTotal || !libHits.length);
+}
+
+async function installItem(h) {
+  if (libBusy) return;
+  libBusy = true; renderLibrary();
+  $('libProgText').textContent = `Installing ${h.title}…`; $('libProgBar').style.width = '0';
+  $('libProgress').classList.remove('hidden');
+  try {
+    const done = await apex.contentInstall({ type: libTab, id: h.id, title: h.title });
+    const extra = done.length > 1 ? ` (+ ${done.length - 1} needed: ${done.slice(1).join(', ')})` : '';
+    toast(`Installed ${h.title}${extra} for Minecraft ${libCtx.mc}`);
+    await refreshInstalled();
+  } catch (e) { toast(errText(e), true); }
+  finally { libBusy = false; $('libProgress').classList.add('hidden'); renderLibrary(); }
+}
+apex.onContentProgress(({ text, p }) => {
+  $('libProgText').textContent = text + (p ? ` · ${Math.round(p * 100)}%` : '…');
+  $('libProgBar').style.width = Math.round((p || 0) * 100) + '%';
+});
+
+async function renderInstalled() {
+  const list = await refreshInstalled();
+  const tp = { mod: 'MOD', resourcepack: 'PACK', shader: 'SHADER' };
+  $('libGrid').innerHTML = list.length ? `<div class="inst-list" style="grid-column:1/-1">${list.map((x, i) => `
+    <div class="inst-row"><span class="tp">${tp[x.type]}</span>
+      <div class="nm"><b>${esc(x.title)}</b><small>${esc(x.file)}${x.version ? ' · ' + esc(x.version) : ''}</small></div>
+      ${x.builtin ? '<span class="btn-installed">Apex</span>' : `<button class="btn-remove" data-i="${i}">Remove</button>`}
+    </div>`).join('')}</div>` : `<div class="empty" style="grid-column:1/-1">Nothing installed for Minecraft ${esc(libCtx.mc)} yet. Browse Mods, Resource packs or Shaders.</div>`;
+  $('libGrid').querySelectorAll('.btn-remove').forEach(b => b.onclick = async () => {
+    const x = list[+b.dataset.i];
+    if (!confirm(`Remove ${x.title} from Minecraft ${libCtx.mc}?`)) return;
+    try { await apex.contentRemove({ type: x.type, file: x.file }); toast(`Removed ${x.title}`); renderInstalled(); }
+    catch (e) { toast(errText(e), true); }
+  });
 }
 
 // ---------------------------------------------------------------- news

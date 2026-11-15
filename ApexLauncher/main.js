@@ -6,6 +6,7 @@ const { Auth } = require('msmc');
 const cfg = require('./config');
 const game = require('./src/game');
 const luanti = require('./src/luanti');
+const content = require('./src/content');
 const DiscordRPC = require('./src/discord');
 const { minecraftLogin, createProfile, nameStatus, niceError, isValid, toMclc } = require('./src/mcauth');
 
@@ -13,6 +14,7 @@ let win;
 let account = null;        // { name, uuid }
 let mcAuth = null;         // msmc Minecraft object
 let gameProc = null;
+let launching = false;   // true while files are being prepared, before the game process exists
 let sessionStart = 0;
 const auth = new Auth('select_account');
 const rpc = new DiscordRPC(cfg.DISCORD_CLIENT_ID);
@@ -222,7 +224,8 @@ async function launchLuanti(launchOpts) {
     || 'Apex' + Math.floor(1000 + Math.random() * 9000);
   if (!settings.luantiName) { settings.luantiName = name; saveSettings(); }
   const g = luanti.GAMES[settings.luantiGame] || luanti.GAMES.mineclonia;
-  gameProc = await luanti.launch({
+  let exited = false;
+  const proc = await luanti.launch({
     root: game.gameDir(app),
     game: g.id,
     name,
@@ -243,26 +246,57 @@ async function launchLuanti(launchOpts) {
       if (settings.closeOnLaunch) win.hide();
     },
     onClose: code => {
-      gameProc = null;
-      if (sessionStart) { settings.stats.totalMs += Date.now() - sessionStart; sessionStart = 0; saveSettings(); }
-      const crashed = code !== 0 && code !== null;
-      if (!win || win.isDestroyed()) { rpc.stop(); app.quit(); return; }
-      if (settings.closeOnLaunch && !crashed) { rpc.stop(); app.quit(); return; }
-      if (!win.isVisible()) win.show();
-      send('game:state', crashed ? 'crashed' : 'closed');
-      if (settings.discordRpc) launcherPresence();
+      exited = true;
+      onGameClosed(code);
     }
   });
-  send('game:state', 'starting');
+  if (!exited) { gameProc = proc; send('game:state', 'starting'); }
   return true;
 }
+
+// ---------------------------------------------------------------- mods / packs / shaders
+async function versionMode(mc) {
+  if (mc === cfg.MC_VERSION) return 'apex';
+  try { return ((await game.listVersions()).find(v => v.id === mc) || {}).mode || 'vanilla'; }
+  catch (_) { return 'vanilla'; }
+}
+ipcMain.handle('content:context', async () => {
+  const mc = settings.version || cfg.MC_VERSION;
+  return { mc, mode: await versionMode(mc) };
+});
+ipcMain.handle('content:search', (_e, o) => content.search({ ...o, mc: settings.version || cfg.MC_VERSION }));
+ipcMain.handle('content:installed', () => content.installed(game.gameDir(app), settings.version || cfg.MC_VERSION));
+ipcMain.handle('content:install', async (_e, o) => {
+  if (gameProc) throw new Error('Close the game first, then install.');
+  const mc = settings.version || cfg.MC_VERSION;
+  const done = await content.install({
+    root: game.gameDir(app), mc, mode: await versionMode(mc), type: o.type, projectId: o.id, title: o.title,
+    download: game.download, progress: (text, p) => send('content:progress', { text, p })
+  });
+  logLine(`Installed for ${mc}: ${done.join(', ') || 'nothing new'}`);
+  return done;
+});
+ipcMain.handle('content:remove', async (_e, o) => {
+  if (gameProc) throw new Error('Close the game first, then remove.');
+  await content.remove(game.gameDir(app), settings.version || cfg.MC_VERSION, o.type, o.file);
+  return true;
+});
 
 ipcMain.handle('luanti:servers', () => luanti.servers());
 ipcMain.handle('luanti:games', () => Object.values(luanti.GAMES).map(g => ({ id: g.id, title: g.title, desc: g.desc })));
 
 ipcMain.handle('game:launch', async (_e, launchOpts = {}) => {
-  if (gameProc) throw new Error('Game is already running');
-  if ((launchOpts.game || settings.game) === 'luanti') return launchLuanti(launchOpts);
+  if (gameProc || launching) throw new Error('A game is already starting or running.');
+  launching = true;
+  try {
+    if ((launchOpts.game || settings.game) === 'luanti') return await launchLuanti(launchOpts);
+    return await launchMinecraft(launchOpts);
+  } finally {
+    launching = false;
+  }
+});
+
+async function launchMinecraft(launchOpts) {
   if (!mcAuth) throw new Error('SIGN_IN');
   if (mcAuth.status === 'needsName' && !launchOpts.allowDemo) throw new Error('NEEDS_NAME');
   // refresh the Minecraft token if it expired while the launcher was open
@@ -279,7 +313,8 @@ ipcMain.handle('game:launch', async (_e, launchOpts = {}) => {
   const ver = settings.version || cfg.MC_VERSION;
   const mode = ver === cfg.MC_VERSION ? 'apex' : (await game.listVersions().then(v => (v.find(x => x.id === ver) || {}).mode).catch(() => 'vanilla')) || 'vanilla';
 
-  gameProc = await game.launch({
+  let exited = false;
+  const proc = await game.launch({
     app,
     auth: toMclc(mcAuth),
     version: settings.version || cfg.MC_VERSION,
@@ -298,22 +333,34 @@ ipcMain.handle('game:launch', async (_e, launchOpts = {}) => {
       if (settings.closeOnLaunch) win.hide();
     },
     onClose: code => {
-      gameProc = null;
-      if (sessionStart) { settings.stats.totalMs += Date.now() - sessionStart; sessionStart = 0; saveSettings(); }
-      const crashed = code !== 0 && code !== null;
-      if (!win || win.isDestroyed()) { rpc.stop(); app.quit(); return; }
-      if (settings.closeOnLaunch && !crashed) { rpc.stop(); app.quit(); return; }
-      if (!win.isVisible()) win.show();           // show the launcher again so a crash can be read
-      send('game:state', crashed ? 'crashed' : 'closed');
-      if (settings.discordRpc) launcherPresence();
+      exited = true;
+      onGameClosed(code);
     }
   });
-  send('game:state', 'starting');
+  if (!exited) { gameProc = proc; send('game:state', 'starting'); }
   return true;
-});
+}
+
+/** Shared by Minecraft and Luanti when the game process ends. */
+function onGameClosed(code) {
+  gameProc = null;
+  if (sessionStart) { settings.stats.totalMs += Date.now() - sessionStart; sessionStart = 0; saveSettings(); }
+  const crashed = code !== 0 && code !== null;
+  if (!win || win.isDestroyed()) { rpc.stop(); app.quit(); return; }
+  if (settings.closeOnLaunch && !crashed) { rpc.stop(); app.quit(); return; }
+  if (!win.isVisible()) win.show();           // show the launcher again so a crash can be read
+  send('game:state', crashed ? 'crashed' : 'closed');
+  if (settings.discordRpc) launcherPresence();
+}
 
 ipcMain.handle('open:folder', () => {
   const dir = game.gameDir(app);
+  fs.mkdirSync(dir, { recursive: true });
+  return shell.openPath(dir);
+});
+ipcMain.handle('open:instance', (_e, sub) => {
+  const safe = ['mods', 'resourcepacks', 'shaderpacks', 'screenshots', 'logs'].includes(sub) ? sub : '';
+  const dir = path.join(game.gameDir(app), 'instances', settings.version || cfg.MC_VERSION, safe);
   fs.mkdirSync(dir, { recursive: true });
   return shell.openPath(dir);
 });

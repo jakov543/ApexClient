@@ -28,6 +28,8 @@ The launcher downloads the open-source [Luanti](https://www.luanti.org) engine a
   - older versions → vanilla
   - each version has its own saves/mods folder; the right Java (8, 17 or 21) is downloaded automatically
 - Microsoft login (remembered securely), Sign out / switch account, Demo support, browse without signing in
+- **Mods & packs** — search Modrinth and install **mods, resource packs and shaders** in one click, per version;
+  required dependencies install automatically, shaders set up Iris + Sodium, Installed tab with Remove
 - **Servers page** — live status (players, MOTD, icon), add/remove servers, one-click **Play** joins directly; Quick join on Home
 - **Screenshots gallery** for all versions
 - **Stats** — play time, launches, last played
@@ -71,6 +73,10 @@ For launcher updates, bump `version` in `ApexLauncher/package.json` and players 
 2. **Repo name** — if your repo isn't `jakov543/ApexClient`, change `MOD_URL`, `DISCORD_IMAGES` and `DOWNLOAD_URL` in `ApexLauncher/config.js`
    and `publish` / `repository` in `ApexLauncher/package.json`.
 3. **News** (optional) — set `NEWS_URL` in `config.js` to a raw `news.json`: `[{"tag":"UPDATE","t":"Title","p":"Text"}]`
+
+## Tests
+`cd ApexLauncher && npm test` — sign-in decisions, downloads (redirects, compressed, broken, web pages, checksums),
+Luanti install, Modrinth installs, and UI wiring. GitHub runs them before every installer build.
 
 ## Build locally (optional)
 Needs **Java 21 JDK** (https://adoptium.net) and **Node.js 20+** (https://nodejs.org).

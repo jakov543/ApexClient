@@ -46,7 +46,10 @@ function httpGet(url, redirects = 0) {
   });
 }
 
-async function download(url, dest, onProgress, sha256) {
+/** check: sha-256 hex string, or { sha512 } / { sha1 } */
+async function download(url, dest, onProgress, check) {
+  const algo = check && typeof check === 'object' ? (check.sha512 ? 'sha512' : 'sha1') : 'sha256';
+  const want = check && typeof check === 'object' ? (check.sha512 || check.sha1) : check;
   let lastErr;
   for (let attempt = 1; attempt <= 3; attempt++) {
     const tmp = dest + '.part';
@@ -55,14 +58,14 @@ async function download(url, dest, onProgress, sha256) {
       const enc = String(res.headers['content-encoding'] || 'identity').toLowerCase();
       const total = enc === 'identity' ? Number(res.headers['content-length']) || 0 : 0;
       let done = 0;
-      const hash = crypto.createHash('sha256');
+      const hash = crypto.createHash(algo);
       await fsp.mkdir(path.dirname(dest), { recursive: true });
       // if a server compresses anyway, undo it properly instead of saving garbage
       const body = /gzip|deflate|br/.test(enc) ? res.pipe(enc.includes('br') ? zlib.createBrotliDecompress() : zlib.createUnzip()) : res;
       body.on('data', c => { done += c.length; hash.update(c); if (total && onProgress) onProgress(done / total); });
       await pipeline(body, fs.createWriteStream(tmp));
       if (total && done !== total) throw new Error('download was cut off');
-      if (sha256 && hash.digest('hex') !== sha256.toLowerCase()) throw new Error('downloaded file is corrupted');
+      if (want && hash.digest('hex') !== String(want).toLowerCase()) throw new Error('downloaded file is corrupted');
       await fsp.rename(tmp, dest);
       return;
     } catch (e) {

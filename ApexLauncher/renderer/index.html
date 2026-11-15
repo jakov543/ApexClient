@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https://mc-heads.net https://api.mcsrvstat.us data: file:; style-src 'self' 'unsafe-inline'; connect-src 'self' https:;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https://mc-heads.net https://api.mcsrvstat.us https://cdn.modrinth.com data: file:; style-src 'self' 'unsafe-inline'; connect-src 'self' https:;">
 <title>Apex Client</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -123,14 +123,37 @@
       <div class="shots" id="shots"></div>
     </section>
 
-    <!-- MODS -->
+    <!-- MODS & PACKS -->
     <section class="page" id="page-mods">
-      <div class="page-head">
-        <h2>Mods</h2>
-        <p>All mods are built in. Press <kbd>Right Shift</kbd> in game to turn them on/off and drag them around.</p>
+      <div class="page-head row">
+        <div><h2>Mods &amp; packs</h2><p id="ctxLine">Loading…</p></div>
+        <button class="ghost" id="btnModsFolder">Open folder</button>
       </div>
-      <div class="filters" id="modFilters"></div>
-      <div class="mod-grid" id="modGrid"></div>
+      <div class="lib-bar">
+        <div class="filters" id="libTabs">
+          <button data-t="mod" class="active">Mods</button>
+          <button data-t="resourcepack">Resource packs</button>
+          <button data-t="shader">Shaders</button>
+          <button data-t="installed">Installed <span class="count" id="instCount">0</span></button>
+          <button data-t="apex">Apex built-in</button>
+        </div>
+        <div class="lib-search" id="libSearch">
+          <input id="libQuery" placeholder="Search Modrinth…" spellcheck="false" autocomplete="off">
+          <select id="libSort">
+            <option value="downloads">Most popular</option>
+            <option value="relevance">Best match</option>
+            <option value="follows">Most followed</option>
+            <option value="newest">Newest</option>
+            <option value="updated">Recently updated</option>
+          </select>
+        </div>
+      </div>
+      <div class="notice hidden" id="libNotice"></div>
+      <div class="lib-progress hidden" id="libProgress"><span id="libProgText">Installing…</span><div class="bar"><i id="libProgBar"></i></div></div>
+      <div class="lib-grid" id="libGrid"></div>
+      <div class="lib-more hidden" id="libMoreWrap"><button class="ghost" id="libMore">Load more</button></div>
+      <div class="filters hidden" id="modFilters"></div>
+      <div class="mod-grid hidden" id="modGrid"></div>
     </section>
 
     <!-- COSMETICS -->

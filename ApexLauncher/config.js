@@ -1,7 +1,7 @@
 // ==== Apex Client launcher settings — change these to rebrand ====
 module.exports = {
   NAME: 'Apex Client',
-  VERSION: '1.5.1',
+  VERSION: '1.6.0',
   MC_VERSION: '1.21.1',
 
   // Folder in %APPDATA% where the game is installed (like .lunarclient)
