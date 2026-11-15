@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld('apex', {
   repair: () => ipcRenderer.invoke('game:repair'),
   stats: () => ipcRenderer.invoke('stats:get'),
   versions: () => ipcRenderer.invoke('versions:list'),
+  luantiServers: () => ipcRenderer.invoke('luanti:servers'),
+  luantiGames: () => ipcRenderer.invoke('luanti:games'),
   openFolder: () => ipcRenderer.invoke('open:folder'),
   openUrl: u => ipcRenderer.invoke('open:url', u),
   onProgress: cb => ipcRenderer.on('game:progress', (_e, d) => cb(d)),

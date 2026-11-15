@@ -22,6 +22,7 @@ const MODS = [
 ];
 
 const NEWS = [
+  { tag: 'FREE', t: 'Luanti — free for everyone', p: 'No Minecraft? Switch to Luanti on Home and play Mineclonia or VoxeLibre for free, no account needed.' },
   { tag: 'v1.4', t: 'New in-game menus', p: 'Brand-new main menu and Right Shift mod menu with profiles, search, and OPTIONS for every mod (1.21.1).' },
   { tag: 'v1.3', t: 'New look & Discord status', p: 'Fresh logo, Rich Presence on every version, and Java 25 support for the newest Minecraft.' },
   { tag: 'NEW', t: 'Every version, 1.8 → latest', p: 'Pick any version next to Launch. 1.21.1 has all Apex mods, other versions get Fabric + Sodium.' },
@@ -57,12 +58,14 @@ $('btnClose').onclick = () => apex.close();
 let currentAccount = null;
 let demoAccepted = false;   // user chose "Later (play Demo)"
 
+const isLuanti = () => settings && settings.game === 'luanti';
 function readySub() {
+  if (isLuanti()) return 'Free · no account needed';
   if (!currentAccount) return 'Sign in with Microsoft to play';
   if (currentAccount.status === 'needsName' && !demoAccepted) return 'Pick your username to play';
   return currentAccount.demo ? 'Demo mode · tap your name → Why Demo?' : 'Ready to play';
 }
-function idleLaunch() { setLaunch(currentAccount ? 'LAUNCH GAME' : 'SIGN IN TO PLAY', readySub()); }
+function idleLaunch() { setLaunch(isLuanti() ? 'PLAY FREE' : (currentAccount ? 'LAUNCH GAME' : 'SIGN IN TO PLAY'), readySub()); }
 
 function showLogin() { $('loginErr').textContent = ''; $('login').classList.add('show'); }
 
@@ -175,7 +178,41 @@ const MODE = {
 };
 let versions = [];
 
+let luantiGames = [{ id: 'mineclonia', title: 'Mineclonia', desc: 'Fast, Minecraft-like survival' }, { id: 'mineclone2', title: 'VoxeLibre', desc: 'Big Minecraft-like game with lots of content' }];
+function showLuantiGame() {
+  const g = luantiGames.find(x => x.id === settings.luantiGame) || luantiGames[0];
+  $('vcLabel').textContent = 'GAME';
+  $('mcVersion').textContent = g.title;
+  $('mcMode').textContent = 'Luanti · no account needed';
+}
+function renderLuantiGames() {
+  $('verList').innerHTML = luantiGames.map(g => `
+    <button class="ver-item ${g.id === settings.luantiGame ? 'sel' : ''}" data-g="${esc(g.id)}">
+      <span>${esc(g.title)}<span class="desc">${esc(g.desc)}</span></span><span class="ver-tag tag-fabric">FREE</span></button>`).join('');
+  $('verList').querySelectorAll('.ver-item').forEach(b => b.onclick = async e => {
+    e.stopPropagation();
+    settings.luantiGame = b.dataset.g;
+    await apex.setSettings({ luantiGame: settings.luantiGame });
+    showLuantiGame();
+    $('versionCard').classList.remove('open');
+  });
+}
+function applyGame() {
+  const l = isLuanti();
+  document.body.classList.toggle('luanti-mode', l);
+  $('gameSwitch').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.game === settings.game));
+  $('verSearch').style.display = l ? 'none' : '';
+  if (l) showLuantiGame(); else { $('vcLabel').textContent = 'VERSION'; showVersion(settings.version); }
+  if (state === 'idle') idleLaunch();
+}
+$('gameSwitch').querySelectorAll('button').forEach(b => b.onclick = async () => {
+  settings.game = b.dataset.game;
+  await apex.setSettings({ game: settings.game });
+  applyGame();
+});
+
 function showVersion(id) {
+  if (isLuanti()) return showLuantiGame();
   const v = versions.find(x => x.id === id) || { id, mode: id === info.mc ? 'apex' : 'vanilla' };
   $('mcVersion').textContent = v.id;
   $('mcMode').textContent = MODE[v.mode].text;
@@ -215,15 +252,22 @@ $('versionCard').onclick = e => {
   e.stopPropagation();
   if (state !== 'idle') return;
   $('versionCard').classList.toggle('open');
-  if ($('versionCard').classList.contains('open')) { $('verSearch').value = ''; renderVersions(); $('verSearch').focus(); }
+  if ($('versionCard').classList.contains('open')) {
+    if (isLuanti()) renderLuantiGames();
+    else { $('verSearch').value = ''; renderVersions(); $('verSearch').focus(); }
+  }
 };
 $('verSearch').oninput = renderVersions;
 $('verMenu').onclick = e => e.stopPropagation();
 document.addEventListener('click', () => $('versionCard').classList.remove('open'));
 
-$('btnSkip').onclick = () => {
+$('btnSkip').onclick = async () => {
   try { localStorage.setItem('skipLogin', '1'); } catch (_) {}
   $('login').classList.remove('show');
+  settings.game = 'luanti';
+  await apex.setSettings({ game: 'luanti' });
+  applyGame();
+  toast('Luanti is free — press PLAY FREE. No account needed!');
 };
 
 $('btnLogin').onclick = async () => {
@@ -250,15 +294,18 @@ function setLaunch(main, sub, p = null, cls = '') {
   $('launchFill').style.width = p == null ? '0' : Math.round(p * 100) + '%';
 }
 
-async function startGame(server) {
-  if (state !== 'idle') return toast('Minecraft is already starting or running.');
-  if (!currentAccount) return showLogin();
-  if (server && currentAccount.demo) return toast('Demo accounts can\'t join servers — that needs a Minecraft licence.', true);
+async function startGame(server, gameOverride) {
+  const which = gameOverride || settings.game || 'minecraft';
+  if (state !== 'idle') return toast('A game is already starting or running.');
+  if (which === 'minecraft') {
+    if (!currentAccount) return showLogin();
+    if (server && currentAccount.demo) return toast('Demo accounts can\'t join Minecraft servers — that needs a Minecraft licence. Luanti servers are free!', true);
+  }
   document.querySelector('[data-page=home]').click();
   state = 'preparing';
   setLaunch('PREPARING', server ? `Joining ${server}…` : 'Checking files…', 0, 'busy');
   try {
-    await apex.launch({ ...(server ? { server } : {}), allowDemo: demoAccepted });
+    await apex.launch({ ...(server ? { server } : {}), game: which, allowDemo: demoAccepted });
   } catch (e) {
     state = 'idle';
     idleLaunch();
@@ -370,7 +417,7 @@ async function renderServers(force = false) {
       <button class="del" title="Remove">✕</button>
     </div>`).join('') : '<div class="empty">No servers yet — add one above.</div>';
 
-  $('serverList').querySelectorAll('.play').forEach(b => b.onclick = () => startGame(b.dataset.addr));
+  $('serverList').querySelectorAll('.play').forEach(b => b.onclick = () => startGame(b.dataset.addr, 'minecraft'));
   $('serverList').querySelectorAll('.del').forEach(b => b.onclick = async () => {
     const i = +b.closest('.srv').dataset.i;
     settings.servers.splice(i, 1);
@@ -399,7 +446,7 @@ async function renderQuick() {
       <img src="assets/emblem.png" alt=""><div class="meta"><b>${esc(sv.name)}</b><small>Checking…</small></div>
       <span class="go">PLAY</span></button>`).join('')
     : '<div class="empty" style="padding:18px">Add servers on the Servers page.</div>';
-  $('quick').querySelectorAll('.qs').forEach(b => b.onclick = () => startGame(b.dataset.addr));
+  $('quick').querySelectorAll('.qs').forEach(b => b.onclick = () => startGame(b.dataset.addr, 'minecraft'));
   list.forEach(async (sv, i) => {
     const d = await serverStatus(sv.address);
     const el = $('quick').querySelector(`.qs[data-i="${i}"]`);
@@ -422,7 +469,33 @@ $('addServer').onsubmit = async e => {
   renderServers(); renderQuick();
   toast(`Added ${name}`);
 };
-$('btnRefreshServers').onclick = () => renderServers(true);
+let srvTab = 'minecraft';
+$('srvTabs').querySelectorAll('button').forEach(b => b.onclick = () => {
+  srvTab = b.dataset.t;
+  $('srvTabs').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+  $('addServer').classList.toggle('hidden', srvTab !== 'minecraft');
+  $('serverList').classList.toggle('hidden', srvTab !== 'minecraft');
+  $('luantiList').classList.toggle('hidden', srvTab !== 'luanti');
+  if (srvTab === 'luanti') renderLuantiServers();
+});
+async function renderLuantiServers() {
+  $('luantiList').innerHTML = '<div class="empty">Loading Luanti servers…</div>';
+  try {
+    const list = await apex.luantiServers();
+    $('luantiList').innerHTML = list.length ? list.map((sv, i) => `
+      <div class="srv">
+        <img src="assets/emblem.png" alt="">
+        <div class="info"><b>${esc(sv.name)}</b><span class="addr">${esc(sv.address)}</span>${sv.game ? `<span class="gtag">${esc(sv.game)}</span>` : ''}
+          <div class="motd"><span class="dot-on"></span>${esc(sv.desc || 'Online')}</div></div>
+        <div class="players"><b>${sv.players}</b>of ${sv.max} · ${esc(sv.version)}</div>
+        <button class="primary play" data-addr="${esc(sv.address)}">Play</button>
+      </div>`).join('') : '<div class="empty">No Luanti servers found.</div>';
+    $('luantiList').querySelectorAll('.play').forEach(b => b.onclick = () => startGame(b.dataset.addr, 'luanti'));
+  } catch (e) {
+    $('luantiList').innerHTML = '<div class="empty">Could not load the Luanti server list. Check your internet and press Refresh.</div>';
+  }
+}
+$('btnRefreshServers').onclick = () => srvTab === 'luanti' ? renderLuantiServers() : renderServers(true);
 
 // ---------------------------------------------------------------- screenshots
 async function loadShots() {
@@ -482,6 +555,11 @@ function bindSettings() {
     apex.setSettings({ width: w, height: h });
   };
   $('resW').onchange = saveRes; $('resH').onchange = saveRes;
+  $('luantiName').value = settings.luantiName || '';
+  $('luantiName').onchange = e => {
+    const v = e.target.value.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 20);
+    e.target.value = v; settings.luantiName = v; apex.setSettings({ luantiName: v });
+  };
   $('jvmArgs').value = settings.jvmArgs || '';
   $('jvmArgs').onchange = e => apex.setSettings({ jvmArgs: e.target.value.trim() });
   ram.addEventListener('change', () => { settings.ramMb = +ram.value; loadStats(); });
@@ -492,7 +570,10 @@ function bindSettings() {
   info = await apex.info();
   settings = await apex.getSettings();
   settings.version = settings.version || info.mc;
-  showVersion(settings.version);
+  settings.game = settings.game || 'minecraft';
+  settings.luantiGame = settings.luantiGame || 'mineclonia';
+  try { luantiGames = await apex.luantiGames(); } catch (_) {}
+  applyGame();
   loadVersions();
   renderMods();
   renderNews();

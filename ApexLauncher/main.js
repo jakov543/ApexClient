@@ -5,6 +5,7 @@ const os = require('os');
 const { Auth } = require('msmc');
 const cfg = require('./config');
 const game = require('./src/game');
+const luanti = require('./src/luanti');
 const DiscordRPC = require('./src/discord');
 const { minecraftLogin, createProfile, nameStatus, niceError, isValid, toMclc } = require('./src/mcauth');
 
@@ -21,6 +22,7 @@ const launcherStart = Math.floor(Date.now() / 1000);
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 const defaults = { ramMb: Math.max(2048, Math.floor(Math.min(4096, os.totalmem() / 1048576 / 2) / 256) * 256), closeOnLaunch: false, discordRpc: true, version: cfg.MC_VERSION,
   fullscreen: false, width: 1280, height: 720, jvmArgs: '',
+  game: 'minecraft', luantiGame: 'mineclonia', luantiName: '',
   servers: [
     { name: 'Hypixel', address: 'mc.hypixel.net' },
     { name: 'CubeCraft', address: 'play.cubecraft.net' },
@@ -204,8 +206,63 @@ ipcMain.handle('account:logout', () => {
   return true;
 });
 
+function sessionStats(version, server) {
+  sessionStart = Date.now();
+  settings.stats = { ...defaults.stats, ...settings.stats };
+  settings.stats.launches++;
+  settings.stats.lastPlayed = Date.now();
+  settings.stats.lastVersion = version;
+  settings.stats.lastServer = server || null;
+  saveSettings();
+}
+
+/** Luanti: free, no account needed */
+async function launchLuanti(launchOpts) {
+  const name = (settings.luantiName || (account && !account.demo && account.name) || '').trim()
+    || 'Apex' + Math.floor(1000 + Math.random() * 9000);
+  if (!settings.luantiName) { settings.luantiName = name; saveSettings(); }
+  const g = luanti.GAMES[settings.luantiGame] || luanti.GAMES.mineclonia;
+  gameProc = await luanti.launch({
+    root: game.gameDir(app),
+    game: g.id,
+    name,
+    server: typeof launchOpts.server === 'string' ? launchOpts.server.trim() : null,
+    helpers: { download: game.download, extract: game.extract },
+    onProgress: (text, p) => send('game:progress', { text, p }),
+    onLog: line => send('game:log', line),
+    onStart: () => {
+      sessionStats('luanti:' + g.id, launchOpts.server);
+      send('game:state', 'running');
+      if (settings.discordRpc) rpc.setActivity({
+        details: launchOpts.server ? `Playing on ${launchOpts.server}` : `Playing ${g.title}`,
+        state: 'Luanti · free to play',
+        timestamps: { start: Math.floor(Date.now() / 1000) },
+        assets: { large_image: img('logo.png'), large_text: `${cfg.NAME} ${cfg.VERSION}`, small_image: img('overworld.png'), small_text: g.title },
+        buttons: rpcButtons()
+      });
+      if (settings.closeOnLaunch) win.hide();
+    },
+    onClose: code => {
+      gameProc = null;
+      if (sessionStart) { settings.stats.totalMs += Date.now() - sessionStart; sessionStart = 0; saveSettings(); }
+      const crashed = code !== 0 && code !== null;
+      if (!win || win.isDestroyed()) { rpc.stop(); app.quit(); return; }
+      if (settings.closeOnLaunch && !crashed) { rpc.stop(); app.quit(); return; }
+      if (!win.isVisible()) win.show();
+      send('game:state', crashed ? 'crashed' : 'closed');
+      if (settings.discordRpc) launcherPresence();
+    }
+  });
+  send('game:state', 'starting');
+  return true;
+}
+
+ipcMain.handle('luanti:servers', () => luanti.servers());
+ipcMain.handle('luanti:games', () => Object.values(luanti.GAMES).map(g => ({ id: g.id, title: g.title, desc: g.desc })));
+
 ipcMain.handle('game:launch', async (_e, launchOpts = {}) => {
   if (gameProc) throw new Error('Game is already running');
+  if ((launchOpts.game || settings.game) === 'luanti') return launchLuanti(launchOpts);
   if (!mcAuth) throw new Error('SIGN_IN');
   if (mcAuth.status === 'needsName' && !launchOpts.allowDemo) throw new Error('NEEDS_NAME');
   // refresh the Minecraft token if it expired while the launcher was open
@@ -234,13 +291,7 @@ ipcMain.handle('game:launch', async (_e, launchOpts = {}) => {
     onProgress: (text, p) => send('game:progress', { text, p }),
     onLog: line => send('game:log', line),
     onStart: () => {
-      sessionStart = Date.now();
-      settings.stats = { ...defaults.stats, ...settings.stats };
-      settings.stats.launches++;
-      settings.stats.lastPlayed = Date.now();
-      settings.stats.lastVersion = settings.version;
-      settings.stats.lastServer = launchOpts.server || null;
-      saveSettings();
+      sessionStats(settings.version, launchOpts.server);
       send('game:state', 'running');
       // Apex (1.21.1) has its own in-game Discord status; other versions get it from the launcher
       if (mode === 'apex') rpc.clear(); else gamePresence(ver, mode, launchOpts.server, mcAuth && mcAuth.demo);

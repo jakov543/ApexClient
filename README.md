@@ -17,6 +17,10 @@ Run it (if Windows says *"Windows protected your PC"* → **More info → Run an
 
 ## Features
 
+**Free for everyone: Luanti** — switch Home to **LUANTI · FREE** and press **PLAY FREE**. No Microsoft account or licence needed.
+The launcher downloads the open-source [Luanti](https://www.luanti.org) engine and a Minecraft-like game
+(**Mineclonia** or **VoxeLibre**) from their official sources, and lists public Luanti servers you can join in one click.
+
 **Launcher**
 - **Every Minecraft release from 1.8 to the newest** — pick it in the version box
   - **1.21.1** → full Apex Client (all mods below)
@@ -78,4 +82,5 @@ Run **`BUILD-ALL.bat`** → installer in `ApexLauncher\dist\`. `TEST-LAUNCHER.ba
 - Logo sources: `ApexClient/discord-assets/*.svg`
 
 ## License
-MIT — see [LICENSE](LICENSE). Not affiliated with Mojang or Microsoft. Minecraft is a trademark of Mojang AB.
+MIT — see [LICENSE](LICENSE). Not affiliated with Mojang, Microsoft or the Luanti project. Minecraft is a trademark of Mojang AB.
+Luanti (LGPL) and its games (GPL) are downloaded from their official sources at runtime and keep their own licences.

@@ -58,13 +58,17 @@
           <div class="chip"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 1 3 6.7L4 21v-6h6l-2.3 2.3A7 7 0 1 0 5 12z"/></svg><span>Last <b id="stLast">never</b></span></div>
           <div class="chip"><svg viewBox="0 0 24 24"><path d="M6 4h12v16H6zM9 7v2h6V7zm0 4v2h6v-2z"/></svg><span><b id="stRam">4 GB</b> RAM</span></div>
         </div>
+        <div class="game-switch" id="gameSwitch">
+          <button data-game="minecraft" class="active">Minecraft</button>
+          <button data-game="luanti">Luanti <span class="free">FREE</span></button>
+        </div>
         <img class="hero-logo" src="assets/logo.png" alt="Apex Client">
         <p class="tagline">Built for performance. Made for PvP.</p>
 
         <div class="launch-wrap">
           <div class="version-card" id="versionCard" title="Choose Minecraft version">
             <div class="vc-icon"><img src="assets/emblem.png" alt=""></div>
-            <div class="vc-text"><small class="vc-label">VERSION</small><b id="mcVersion">1.21.1</b><small id="mcMode">Apex Client</small></div>
+            <div class="vc-text"><small class="vc-label" id="vcLabel">VERSION</small><b id="mcVersion">1.21.1</b><small id="mcMode">Apex Client</small></div>
             <svg class="chev" viewBox="0 0 12 12"><path d="M3 7l3-3 3 3"/></svg>
             <div class="ver-menu" id="verMenu">
               <input id="verSearch" placeholder="Search version…" autocomplete="off">
@@ -97,12 +101,17 @@
         <div><h2>Servers</h2><p>Live status of your favourite servers. Press <b>Play</b> to join straight from the launcher.</p></div>
         <button class="ghost" id="btnRefreshServers">↻ Refresh</button>
       </div>
+      <div class="filters srv-tabs" id="srvTabs">
+        <button data-t="minecraft" class="active">Minecraft</button>
+        <button data-t="luanti">Luanti · free</button>
+      </div>
       <form class="add-server" id="addServer">
         <input id="srvName" placeholder="Name (e.g. My server)" maxlength="32">
         <input id="srvAddr" placeholder="Address (e.g. play.example.com)" maxlength="80" required>
         <button class="primary" type="submit">+ Add server</button>
       </form>
       <div class="server-list" id="serverList"></div>
+      <div class="server-list hidden" id="luantiList"></div>
     </section>
 
     <!-- SCREENSHOTS -->
@@ -148,6 +157,12 @@
           <div class="set-row">
             <div class="acc-row"><img id="setAvatar" src="assets/emblem.png" alt=""><div><b id="setAccName">Not signed in</b><small id="setAccSub">Microsoft account</small></div></div>
             <button class="ghost" id="btnSetAcc">Sign in</button>
+          </div>
+        </div>
+        <div class="set-card">
+          <div class="set-row">
+            <div><b>Luanti player name</b><small>Used for Luanti (free game). Letters, numbers, - and _ only.</small></div>
+            <input class="txt" id="luantiName" maxlength="20" placeholder="Player" spellcheck="false" style="font-family:inherit;width:200px">
           </div>
         </div>
         <div class="set-card">
@@ -217,7 +232,7 @@
       No Microsoft account? <button class="linkbtn" id="btnCreateMs">Create one for free</button>
       <small>You can use your Gmail, Outlook or any email address. Minecraft only works with Microsoft accounts.</small>
     </div>
-    <button class="skip" id="btnSkip">Continue without signing in</button>
+    <button class="skip" id="btnSkip">Continue without signing in — play Luanti for free</button>
     <p class="login-note">No Minecraft yet? Sign in anyway to play the free Demo.</p>
   </div>
 </div>

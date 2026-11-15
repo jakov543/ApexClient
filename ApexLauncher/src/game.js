@@ -308,4 +308,4 @@ async function launch(opts) {
   return proc;
 }
 
-module.exports = { launch, gameDir, listVersions };
+module.exports = { launch, gameDir, listVersions, download, extract };
