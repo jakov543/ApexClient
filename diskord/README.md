@@ -1,8 +1,10 @@
-# Flixcord
+# Diskord
 
-Flixcord is a Discord-style chat app made for the Apex crew.
+(formerly Flixcord)
 
-**Open Flixcord:** https://claude.ai/artifact/JmfsXjNXdnXfMiNrJP5a3t  (the owner invites friends by email as *Editor* so they can chat)
+Diskord is a Discord-style chat app made for the Apex crew.
+
+**Open Diskord:** https://claude.ai/artifact/JmfsXjNXdnXfMiNrJP5a3t  (the owner invites friends by email as *Editor* so they can chat)
 
 ## Features
 - Servers with your own picture or emoji icon, colours, text channels and **voice channels**
@@ -12,13 +14,14 @@ Flixcord is a Discord-style chat app made for the Apex crew.
 - Your own profile picture and banner, custom status and an "about me"
 - **Custom server emoji** (upload your own, use them with `:name:`) and 1,300+ emoji with search and recents
 - Replies, edit, delete, pins, reactions, polls (`/poll Q | A | B`), spoilers, code, mentions, images and search
-- Themes: Flix, Midnight, Grass and Light, plus a compact mode
+- **GIFs**: built-in pack plus a shared GIF library (upload your own), favorites
+- Themes: Diskord, Midnight, Grass and Light, plus a compact mode
 
 ## Files
 | File | What it is |
 |---|---|
-| `index.html` | The Flixcord app (runs on claude.ai, which stores the messages) |
-| `call.html` | The call page, served by GitHub Pages: https://jakov543.github.io/ApexClient/flixcord/call.html |
+| `index.html` | The Diskord app (runs on claude.ai, which stores the messages) |
+| `call.html` | The call page, served by GitHub Pages: https://jakov543.github.io/ApexClient/diskord/call.html |
 | `logo.svg` | Logo |
 
 Calls are peer-to-peer (WebRTC through PeerJS). Audio and video go straight between the people in the call, and nothing is recorded. A few very strict networks (some school or work Wi-Fi) can block peer-to-peer calls.

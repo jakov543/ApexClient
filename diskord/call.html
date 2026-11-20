@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Flixcord Call</title>
+<title>Diskord Call</title>
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -65,7 +65,7 @@ header .live i { width: 8px; height: 8px; border-radius: 50%; background: var(--
 </style>
 </head>
 <body>
-<header><img src="logo.svg" alt=""><b>Flixcord</b><span class="room" id="roomLabel"></span><span class="live hidden" id="live"><i></i><span id="count"></span></span></header>
+<header><img src="logo.svg" alt=""><b>Diskord</b><span class="room" id="roomLabel"></span><span class="live hidden" id="live"><i></i><span id="count"></span></span></header>
 
 <div class="lobby" id="lobby"><div class="card">
   <img class="logo" src="logo.svg" alt="">
@@ -104,7 +104,7 @@ $('name').value = params.get('n') || store.get('name', '');
 $('roomLabel').textContent = TITLE ? '· ' + TITLE : '';
 if (!ROOM) {
   $('lobbyTitle').textContent = 'No call here';
-  $('lobbyText').textContent = 'Open a call from Flixcord (the phone button in a channel or on someone\'s profile, or a voice channel).';
+  $('lobbyText').textContent = 'Open a call from Diskord (the phone button in a channel or on someone\'s profile, or a voice channel).';
   ['name', 'join'].forEach(id => $(id).classList.add('hidden')); document.querySelector('.meter').classList.add('hidden');
   return;
 }
@@ -113,6 +113,7 @@ if (typeof Peer === 'undefined') { $('lobbyText').textContent = 'Could not load 
 const COLORS = ['#ff3d6e', '#8b5cf6', '#22c1ee', '#2bd98a', '#ffb020', '#ff7a45', '#4f7cff', '#e94cd8'];
 const colorOf = s => COLORS[[...String(s)].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
 const PREFIX = 'flixcord-v1-' + ROOM;
+const tellOpener = t => { try { if (window.opener) window.opener.postMessage({ diskord: t, room: ROOM }, '*'); } catch (_) {} };
 const ICE = { iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }] };
 
 // ------------------------------------------------------------ local media
@@ -162,7 +163,7 @@ $('join').onclick = async () => {
   if (ac && ac.state === 'suspended') ac.resume();
   if (!mic) await getMic();
   peer = new Peer(PREFIX + '-' + Math.random().toString(36).slice(2, 10), { config: ICE, debug: 0 });
-  peer.on('open', id => { me.id = id; $('lobby').classList.add('hidden'); ['stage', 'bar', 'live'].forEach(x => $(x).classList.remove('hidden')); addTile(id, true); claimDirectory(); });
+  peer.on('open', id => { me.id = id; tellOpener('alive'); setInterval(() => { if (!left) tellOpener('alive'); }, 20000); $('lobby').classList.add('hidden'); ['stage', 'bar', 'live'].forEach(x => $(x).classList.remove('hidden')); addTile(id, true); claimDirectory(); });
   peer.on('call', call => { call.answer(outStream()); wireCall(call); });
   peer.on('error', e => { if (e.type === 'peer-unavailable') return; console.warn(e); if (!me.id) { $('join').disabled = false; $('join').textContent = 'Try again'; toast('Could not connect (' + e.type + ')'); } });
   peer.on('disconnected', () => { if (!left) setTimeout(() => peer && !peer.destroyed && peer.reconnect(), 1500); });
@@ -288,13 +289,13 @@ $('bLink').onclick = async () => {
 };
 let left = false;
 $('bLeave').onclick = () => {
-  left = true;
+  left = true; tellOpener('left');
   for (const id of [...calls.keys()]) dropPeer(id);
   [peer, dirPeer].forEach(p => p && p.destroy());
   [mic, camTrack, screenTrack].forEach(x => x && (x.getTracks ? x.getTracks() : [x]).forEach(t => t.stop()));
-  document.body.insertAdjacentHTML('beforeend', `<div class="ended"><div class="card"><img class="logo" src="logo.svg" alt=""><h1>You left the call</h1><p>You can close this tab and go back to Flixcord.</p><button class="big" onclick="location.reload()">Rejoin</button></div></div>`);
+  document.body.insertAdjacentHTML('beforeend', `<div class="ended"><div class="card"><img class="logo" src="logo.svg" alt=""><h1>You left the call</h1><p>You can close this tab and go back to Diskord.</p><button class="big" onclick="location.reload()">Rejoin</button></div></div>`);
 };
-addEventListener('beforeunload', () => { left = true; [peer, dirPeer].forEach(p => p && p.destroy()); });
+addEventListener('beforeunload', () => { if (me.id) tellOpener('left'); left = true; [peer, dirPeer].forEach(p => p && p.destroy()); });
 })();
 </script>
 </body>
